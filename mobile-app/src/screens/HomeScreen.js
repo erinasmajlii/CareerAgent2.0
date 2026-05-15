@@ -1,197 +1,158 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
-  View, Text, TouchableOpacity, TextInput, FlatList,
-  StyleSheet, Keyboard, TouchableWithoutFeedback, ActivityIndicator, ScrollView
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
 } from 'react-native';
-import * as DocumentPicker from 'expo-document-picker';
-import * as Haptics from 'expo-haptics';
-import { analyzeGap } from '../api';
+import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Circle } from 'react-native-svg';
+import { C, GRAD, shadow, shadowSm } from '../theme';
 
-const QUICK_ROLES = ['Software Engineer', 'Product Manager', 'Data Scientist', 'UX Designer', 'DevOps Engineer'];
-
-export default function HomeScreen() {
-  const [jdText, setJdText] = useState('');
-  const [resumeFile, setResumeFile] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
-  const [activeView, setActiveView] = useState('input'); // input | result
-
-  const handlePickDocument = async () => {
-    try {
-      const res = await DocumentPicker.getDocumentAsync({ type: 'application/pdf' });
-      if (!res.canceled && res.assets?.length > 0) {
-        setResumeFile(res.assets[0]);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      }
-    } catch (e) { console.log(e); }
-  };
-
-  const handleInfiltrate = async () => {
-    if (!jdText.trim()) return;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Keyboard.dismiss();
-    setLoading(true);
-    try {
-      const data = await analyzeGap(resumeFile?.uri, jdText);
-      setResult(data);
-      setActiveView('result');
-    } catch (e) {
-      alert('Analysis failed. Check backend connection.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleReset = () => {
-    setResult(null);
-    setJdText('');
-    setResumeFile(null);
-    setActiveView('input');
-  };
-
-  if (activeView === 'result' && result) {
-    return <ResultView result={result} onReset={handleReset} />;
-  }
-
+function CircularGauge({ pct, size = 90, stroke = 9 }) {
+  const r = (size - stroke) / 2;
+  const circ = 2 * Math.PI * r;
+  const offset = circ - (pct / 100) * circ;
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        <View style={styles.hero}>
-          <Text style={styles.heroLabel}>[ SYSTEM READY ]</Text>
-          <Text style={styles.heroTitle}>CareerAgent</Text>
-          <Text style={styles.heroSubtitle}>Drop your resume. Paste the JD. Let AI do the rest.</Text>
-        </View>
-
-        <Text style={styles.sectionLabel}>QUICK ROLE TAGS</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tagsRow}>
-          {QUICK_ROLES.map(role => (
-            <TouchableOpacity key={role} style={styles.tag} onPress={() => setJdText(role + ' - ')}>
-              <Text style={styles.tagText}>{role}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        <Text style={styles.sectionLabel}>JOB DESCRIPTION</Text>
-        <TextInput
-          style={styles.jdInput}
-          placeholder="Paste the full job description here..."
-          placeholderTextColor="#444"
-          value={jdText}
-          onChangeText={setJdText}
-          multiline
-          returnKeyType="done"
-          blurOnSubmit
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={size} height={size} style={{ position: 'absolute' }}>
+        <Circle cx={size / 2} cy={size / 2} r={r} stroke="rgba(255,255,255,0.25)" strokeWidth={stroke} fill="none" />
+        <Circle
+          cx={size / 2} cy={size / 2} r={r}
+          stroke="#10B981" strokeWidth={stroke} fill="none"
+          strokeDasharray={circ} strokeDashoffset={offset}
+          strokeLinecap="round" rotation="-90" origin={`${size / 2},${size / 2}`}
         />
-
-        <Text style={styles.sectionLabel}>RESUME</Text>
-        <TouchableOpacity style={[styles.resumeBox, resumeFile && styles.resumeBoxActive]} onPress={handlePickDocument}>
-          <Text style={styles.resumeIcon}>{resumeFile ? '✓' : '↑'}</Text>
-          <Text style={[styles.resumeText, resumeFile && styles.resumeTextActive]}>
-            {resumeFile ? resumeFile.name : 'Tap to select PDF resume'}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.ctaButton, (!jdText.trim() || loading) && styles.ctaDisabled]}
-          onPress={handleInfiltrate}
-          disabled={!jdText.trim() || loading}
-          activeOpacity={0.8}
-        >
-          {loading
-            ? <ActivityIndicator color="#000" />
-            : <Text style={styles.ctaText}>[ INFILTRATE ]</Text>
-          }
-        </TouchableOpacity>
-
-        {loading && (
-          <View style={styles.statusBox}>
-            <Text style={styles.statusText}>▶ Connecting to Ghost Network...</Text>
-            <Text style={styles.statusText}>▶ Running gap analysis via Gemini...</Text>
-          </View>
-        )}
-      </ScrollView>
-    </TouchableWithoutFeedback>
+      </Svg>
+      <Text style={{ color: '#fff', fontSize: 20, fontWeight: '900' }}>{pct}%</Text>
+    </View>
   );
 }
 
-function ResultView({ result, onReset }) {
-  const isGood = result.match_score >= 70;
+const QUICK = [
+  { icon: '📄', label: 'Upload Resume', sub: 'Update for ATS', bg: '#EEF0FF', tab: 'Generate' },
+  { icon: '🔍', label: 'Analyze Job', sub: 'Get AI insights', bg: '#ECFDF5', tab: 'Analyze' },
+  { icon: '✉️', label: 'Cover Letter', sub: 'Generate with AI', bg: '#FFF7ED', tab: null },
+  { icon: '🎤', label: 'Interview Prep', sub: 'Practice questions', bg: '#FEF3C7', tab: 'Prep' },
+];
+
+const APPS = [
+  { role: 'Senior Software Engineer', company: 'Google', status: 'Active', sc: C.success, time: '2 days ago' },
+  { role: 'Frontend Developer', company: 'Meta', status: 'Applied', sc: C.warning, time: '5 days ago' },
+  { role: 'Staff Engineer', company: 'Stripe', status: 'In Review', sc: '#6C63FF', time: '1 week ago' },
+];
+
+export default function HomeScreen({ navigation }) {
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-      <View style={[styles.scoreCard, isGood ? styles.scoreCardGood : styles.scoreCardWarn]}>
-        <Text style={styles.scoreCardLabel}>MATCH SCORE</Text>
-        <Text style={[styles.scoreCardValue, isGood ? styles.colorMatrix : styles.colorWarning]}>
-          {result.match_score}%
-        </Text>
-        <Text style={styles.scoreCardSub}>{isGood ? 'Strong Match' : 'Needs Work'}</Text>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      {/* Header Card */}
+      <LinearGradient colors={GRAD} style={styles.headerCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+        <View style={styles.headerTop}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.welcomeSub}>Welcome Back 👋</Text>
+            <Text style={styles.welcomeName}>Sarah</Text>
+            <Text style={styles.welcomeDate}>May 15, 2026</Text>
+          </View>
+          <View style={styles.gradeWrap}>
+            <CircularGauge pct={78} />
+            <Text style={styles.gradeLabel}>ATS Grade</Text>
+            <View style={styles.gradeDelta}>
+              <Text style={styles.gradeDeltaText}>↑ +2.5%</Text>
+            </View>
+          </View>
+        </View>
+      </LinearGradient>
+
+      {/* Quick Actions */}
+      <Text style={styles.sectionTitle}>Quick Actions</Text>
+      <View style={styles.grid}>
+        {QUICK.map((q, i) => (
+          <TouchableOpacity
+            key={i} style={[styles.actionCard, { backgroundColor: q.bg }]}
+            onPress={() => q.tab && navigation.navigate(q.tab)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.actionIcon}>{q.icon}</Text>
+            <Text style={styles.actionLabel}>{q.label}</Text>
+            <Text style={styles.actionSub}>{q.sub}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
-      <Text style={styles.sectionLabel}>THE CHEAT SHEET</Text>
-      {result.cheat_sheet.map((item, i) => (
-        <View key={i} style={styles.cheatCard}>
-          <View style={styles.cheatIndex}><Text style={styles.cheatIndexText}>{i + 1}</Text></View>
-          <Text style={styles.cheatCardText}>{item}</Text>
-        </View>
-      ))}
+      {/* Recent Applications */}
+      <View style={styles.sectionRow}>
+        <Text style={styles.sectionTitle}>Recent Applications</Text>
+        <TouchableOpacity><Text style={styles.seeAll}>See all</Text></TouchableOpacity>
+      </View>
+      <View style={styles.card}>
+        {APPS.map((a, i) => (
+          <View key={i} style={[styles.appRow, i < APPS.length - 1 && styles.appRowBorder]}>
+            <View style={[styles.appIcon, { backgroundColor: C.primaryLight }]}>
+              <Text style={{ fontSize: 18 }}>🏢</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.appRole}>{a.role}</Text>
+              <Text style={styles.appCompany}>{a.company} · {a.time}</Text>
+            </View>
+            <View style={[styles.statusBadge, { backgroundColor: a.sc + '20' }]}>
+              <Text style={[styles.statusText, { color: a.sc }]}>{a.status}</Text>
+            </View>
+          </View>
+        ))}
+      </View>
 
-      <TouchableOpacity style={styles.resetButton} onPress={onReset}>
-        <Text style={styles.resetButtonText}>← Run New Analysis</Text>
-      </TouchableOpacity>
+      {/* Resume Analysis */}
+      <Text style={styles.sectionTitle}>Resume Analysis</Text>
+      <View style={[styles.card, styles.resumeCard]}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.resumeName}>Senior_Developer_Resume.pdf</Text>
+          <Text style={styles.resumeSub}>Last updated · 3 days ago</Text>
+          <View style={styles.scoreBar}>
+            <View style={[styles.scoreBarFill, { width: '78%' }]} />
+          </View>
+          <Text style={styles.resumeScore}>ATS Score: 78%</Text>
+        </View>
+        <TouchableOpacity>
+          <Text style={styles.analyzeLink}>Analyze →</Text>
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 }
 
-const C = { green: '#00FF41', amber: '#FFBF00', bg: '#000', card: '#0D0D0D', border: '#1A1A1A', muted: '#555' };
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.bg },
-  scrollContent: { padding: 20, paddingBottom: 40 },
-  hero: { marginBottom: 28, borderLeftWidth: 3, borderLeftColor: C.green, paddingLeft: 14 },
-  heroLabel: { color: C.green, fontSize: 10, letterSpacing: 3, marginBottom: 4, opacity: 0.7 },
-  heroTitle: { color: C.green, fontSize: 30, fontWeight: '900', letterSpacing: 2 },
-  heroSubtitle: { color: C.muted, fontSize: 13, marginTop: 4, lineHeight: 18 },
-  sectionLabel: { color: C.muted, fontSize: 10, letterSpacing: 3, marginBottom: 8, marginTop: 20 },
-  tagsRow: { flexDirection: 'row', marginBottom: 4 },
-  tag: { borderWidth: 1, borderColor: C.green, paddingHorizontal: 12, paddingVertical: 6, marginRight: 8, borderRadius: 2 },
-  tagText: { color: C.green, fontSize: 11, letterSpacing: 1 },
-  jdInput: {
-    backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
-    color: '#ccc', padding: 16, minHeight: 140, textAlignVertical: 'top',
-    fontSize: 14, lineHeight: 22, borderRadius: 4,
+  content: { paddingBottom: 32 },
+  headerCard: { margin: 16, borderRadius: 20, padding: 22, ...shadow },
+  headerTop: { flexDirection: 'row', alignItems: 'center' },
+  welcomeSub: { color: 'rgba(255,255,255,0.8)', fontSize: 14 },
+  welcomeName: { color: '#fff', fontSize: 26, fontWeight: '800', marginTop: 2 },
+  welcomeDate: { color: 'rgba(255,255,255,0.6)', fontSize: 12, marginTop: 4 },
+  gradeWrap: { alignItems: 'center', gap: 4 },
+  gradeLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: '600' },
+  gradeDelta: { backgroundColor: 'rgba(16,185,129,0.25)', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2 },
+  gradeDeltaText: { color: '#6EE7B7', fontSize: 11, fontWeight: '700' },
+  sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, marginTop: 20, marginBottom: 10 },
+  sectionTitle: { color: C.text, fontSize: 17, fontWeight: '700', paddingHorizontal: 16, marginTop: 20, marginBottom: 10 },
+  seeAll: { color: C.primary, fontSize: 13, fontWeight: '600' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, gap: 8 },
+  actionCard: {
+    width: '47%', borderRadius: 16, padding: 16, marginHorizontal: 2,
+    ...shadowSm, shadowColor: '#000',
   },
-  resumeBox: {
-    flexDirection: 'row', alignItems: 'center', padding: 16,
-    backgroundColor: C.card, borderWidth: 1, borderColor: C.border,
-    borderStyle: 'dashed', borderRadius: 4, gap: 12,
-  },
-  resumeBoxActive: { borderColor: C.amber, borderStyle: 'solid' },
-  resumeIcon: { color: C.green, fontSize: 22, width: 28, textAlign: 'center' },
-  resumeText: { color: C.muted, fontSize: 13, flex: 1 },
-  resumeTextActive: { color: C.amber },
-  ctaButton: {
-    marginTop: 28, backgroundColor: C.green, paddingVertical: 18,
-    alignItems: 'center', borderRadius: 4,
-  },
-  ctaDisabled: { opacity: 0.35 },
-  ctaText: { color: '#000', fontWeight: '900', fontSize: 16, letterSpacing: 3 },
-  statusBox: { marginTop: 18, padding: 14, backgroundColor: C.card, borderLeftWidth: 3, borderLeftColor: C.green },
-  statusText: { color: C.green, fontSize: 12, marginBottom: 4, opacity: 0.8 },
-  scoreCard: { padding: 28, alignItems: 'center', borderRadius: 6, marginBottom: 24, borderWidth: 1 },
-  scoreCardGood: { borderColor: C.green, backgroundColor: 'rgba(0,255,65,0.05)' },
-  scoreCardWarn: { borderColor: C.amber, backgroundColor: 'rgba(255,191,0,0.05)' },
-  scoreCardLabel: { color: C.muted, fontSize: 10, letterSpacing: 3, marginBottom: 8 },
-  scoreCardValue: { fontSize: 80, fontWeight: '900' },
-  scoreCardSub: { color: C.muted, fontSize: 13, marginTop: 4 },
-  colorMatrix: { color: C.green },
-  colorWarning: { color: C.amber },
-  cheatCard: {
-    flexDirection: 'row', backgroundColor: C.card, borderRadius: 4,
-    padding: 16, marginBottom: 12, alignItems: 'flex-start', gap: 12,
-    borderWidth: 1, borderColor: C.border,
-  },
-  cheatIndex: { width: 24, height: 24, backgroundColor: C.amber, borderRadius: 2, alignItems: 'center', justifyContent: 'center' },
-  cheatIndexText: { color: '#000', fontWeight: '900', fontSize: 12 },
-  cheatCardText: { color: '#ccc', flex: 1, fontSize: 14, lineHeight: 20 },
-  resetButton: { marginTop: 24, padding: 16, borderWidth: 1, borderColor: C.border, alignItems: 'center', borderRadius: 4 },
-  resetButtonText: { color: C.green, fontSize: 14, letterSpacing: 1 },
+  actionIcon: { fontSize: 28, marginBottom: 8 },
+  actionLabel: { color: C.text, fontSize: 14, fontWeight: '700', marginBottom: 3 },
+  actionSub: { color: C.subtext, fontSize: 12 },
+  card: { marginHorizontal: 16, backgroundColor: C.surface, borderRadius: 16, ...shadowSm, shadowColor: '#000' },
+  appRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
+  appRowBorder: { borderBottomWidth: 1, borderBottomColor: C.border },
+  appIcon: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  appRole: { color: C.text, fontSize: 13, fontWeight: '600' },
+  appCompany: { color: C.subtext, fontSize: 12, marginTop: 2 },
+  statusBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+  statusText: { fontSize: 11, fontWeight: '700' },
+  resumeCard: { padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  resumeName: { color: C.text, fontSize: 13, fontWeight: '600' },
+  resumeSub: { color: C.subtext, fontSize: 12, marginTop: 2, marginBottom: 8 },
+  scoreBar: { height: 6, backgroundColor: C.border, borderRadius: 3, overflow: 'hidden' },
+  scoreBarFill: { height: '100%', backgroundColor: C.success, borderRadius: 3 },
+  resumeScore: { color: C.success, fontSize: 12, fontWeight: '700', marginTop: 4 },
+  analyzeLink: { color: C.primary, fontSize: 13, fontWeight: '700' },
 });
