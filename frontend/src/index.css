@@ -1,0 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-terminalBg text-matrix font-mono m-0 min-h-screen;
+}
