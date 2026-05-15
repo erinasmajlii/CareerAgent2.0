@@ -1,31 +1,62 @@
-import React from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { C, GRAD, shadow, shadowSm } from '../theme';
-
-const STATS = [
-  { value: '12', label: 'Saved\nResumes' },
-  { value: '24', label: 'Applications\nTracked' },
-  { value: '143', label: 'Practice\nSessions' },
-];
-
-const MY_CONTENT = [
-  { icon: '📄', label: 'Saved Resumes', count: '3 documents' },
-  { icon: '📋', label: 'Applications', count: '24 tracking' },
-];
+import { useAuth } from '../context/AuthContext';
+import { fetchAnalyses, fetchApplications, fetchPrepSessions } from '../api';
 
 export default function ProfileScreen({ navigation }) {
+  const { profile, user, signOut } = useAuth();
+  const [stats, setStats] = useState({ resumes: 0, applications: 0, sessions: 0 });
+  const [loading, setLoading] = useState(true);
+
+  const loadStats = useCallback(async () => {
+    setLoading(true);
+    const [analyses, apps, sessions] = await Promise.all([
+      fetchAnalyses(100),
+      fetchApplications(100),
+      fetchPrepSessions(100),
+    ]);
+    setStats({
+      resumes: analyses.length,
+      applications: apps.length,
+      sessions: sessions.length,
+    });
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadStats(); }, [loadStats]);
+
+  const displayName = profile?.full_name || user?.email?.split('@')[0] || 'User';
+  const initials = displayName.charAt(0).toUpperCase();
+  const email = user?.email || '';
+
+  const STATS = [
+    { value: String(stats.resumes), label: 'Saved\nAnalyses' },
+    { value: String(stats.applications), label: 'Applications\nTracked' },
+    { value: String(stats.sessions), label: 'Practice\nSessions' },
+  ];
+
+  const MY_CONTENT = [
+    { icon: '📄', label: 'Saved Analyses', count: `${stats.resumes} analyses` },
+    { icon: '📋', label: 'Applications', count: `${stats.applications} tracking` },
+  ];
+
+  const handleSignOut = async () => {
+    try { await signOut(); } catch (e) { console.warn('Sign out error:', e.message); }
+  };
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       {/* Header Card */}
       <LinearGradient colors={GRAD} style={styles.headerCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
         <View style={styles.avatar}>
-          <Text style={styles.avatarText}>S</Text>
+          <Text style={styles.avatarText}>{initials}</Text>
         </View>
-        <Text style={styles.userName}>Sarah Johnson</Text>
-        <Text style={styles.userEmail}>sarah@example.com</Text>
+        <Text style={styles.userName}>{displayName}</Text>
+        <Text style={styles.userEmail}>{email}</Text>
         <TouchableOpacity style={styles.editBtn}>
           <Text style={styles.editText}>Edit Profile</Text>
         </TouchableOpacity>
@@ -33,15 +64,19 @@ export default function ProfileScreen({ navigation }) {
 
       {/* Stats Row */}
       <View style={styles.statsCard}>
-        {STATS.map((s, i) => (
-          <React.Fragment key={i}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{s.value}</Text>
-              <Text style={styles.statLabel}>{s.label}</Text>
-            </View>
-            {i < STATS.length - 1 && <View style={styles.statDivider} />}
-          </React.Fragment>
-        ))}
+        {loading ? (
+          <ActivityIndicator color={C.primary} style={{ padding: 20, flex: 1 }} />
+        ) : (
+          STATS.map((s, i) => (
+            <React.Fragment key={i}>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{s.value}</Text>
+                <Text style={styles.statLabel}>{s.label}</Text>
+              </View>
+              {i < STATS.length - 1 && <View style={styles.statDivider} />}
+            </React.Fragment>
+          ))
+        )}
       </View>
 
       {/* My Content */}
@@ -81,7 +116,7 @@ export default function ProfileScreen({ navigation }) {
       </View>
 
       {/* Logout */}
-      <TouchableOpacity style={styles.logoutBtn}>
+      <TouchableOpacity style={styles.logoutBtn} onPress={handleSignOut}>
         <Text style={styles.logoutText}>Log Out</Text>
       </TouchableOpacity>
     </ScrollView>

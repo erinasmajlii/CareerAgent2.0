@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle } from 'react-native-svg';
 import { C, GRAD, shadow, shadowSm } from '../theme';
+import { useAuth } from '../context/AuthContext';
+import { fetchApplications, fetchAnalyses } from '../api';
 
 function CircularGauge({ pct, size = 90, stroke = 9 }) {
   const r = (size - stroke) / 2;
@@ -33,13 +35,49 @@ const QUICK = [
   { icon: '🎤', label: 'Interview Prep', sub: 'Practice questions', bg: '#FEF3C7', tab: 'Prep' },
 ];
 
-const APPS = [
-  { role: 'Senior Software Engineer', company: 'Google', status: 'Active', sc: C.success, time: '2 days ago' },
-  { role: 'Frontend Developer', company: 'Meta', status: 'Applied', sc: C.warning, time: '5 days ago' },
-  { role: 'Staff Engineer', company: 'Stripe', status: 'In Review', sc: '#6C63FF', time: '1 week ago' },
-];
+const STATUS_COLORS = {
+  active: C.success, applied: C.warning,
+  in_review: '#6C63FF', offer: '#10B981', rejected: C.danger,
+};
+const STATUS_LABELS = {
+  active: 'Active', applied: 'Applied',
+  in_review: 'In Review', offer: 'Offer', rejected: 'Rejected',
+};
+
+function timeAgo(dateStr) {
+  if (!dateStr) return '';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return days < 7 ? `${days}d ago` : `${Math.floor(days / 7)}w ago`;
+}
 
 export default function HomeScreen({ navigation }) {
+  const { profile, user } = useAuth();
+  const [applications, setApplications] = useState([]);
+  const [latestScore, setLatestScore] = useState(null);
+  const [loadingApps, setLoadingApps] = useState(true);
+
+  const loadData = useCallback(async () => {
+    setLoadingApps(true);
+    const [apps, analyses] = await Promise.all([
+      fetchApplications(5),
+      fetchAnalyses(1),
+    ]);
+    setApplications(apps);
+    if (analyses.length > 0) setLatestScore(analyses[0].match_score);
+    setLoadingApps(false);
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const displayName = profile?.full_name || user?.email?.split('@')[0] || 'there';
+  const atsScore = latestScore ?? 0;
+  const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       {/* Header Card */}
@@ -47,15 +85,17 @@ export default function HomeScreen({ navigation }) {
         <View style={styles.headerTop}>
           <View style={{ flex: 1 }}>
             <Text style={styles.welcomeSub}>Welcome Back 👋</Text>
-            <Text style={styles.welcomeName}>Sarah</Text>
-            <Text style={styles.welcomeDate}>May 15, 2026</Text>
+            <Text style={styles.welcomeName}>{displayName}</Text>
+            <Text style={styles.welcomeDate}>{today}</Text>
           </View>
           <View style={styles.gradeWrap}>
-            <CircularGauge pct={78} />
+            <CircularGauge pct={atsScore} />
             <Text style={styles.gradeLabel}>ATS Grade</Text>
-            <View style={styles.gradeDelta}>
-              <Text style={styles.gradeDeltaText}>↑ +2.5%</Text>
-            </View>
+            {latestScore !== null && (
+              <View style={styles.gradeDelta}>
+                <Text style={styles.gradeDeltaText}>Latest Score</Text>
+              </View>
+            )}
           </View>
         </View>
       </LinearGradient>
@@ -82,37 +122,54 @@ export default function HomeScreen({ navigation }) {
         <TouchableOpacity><Text style={styles.seeAll}>See all</Text></TouchableOpacity>
       </View>
       <View style={styles.card}>
-        {APPS.map((a, i) => (
-          <View key={i} style={[styles.appRow, i < APPS.length - 1 && styles.appRowBorder]}>
-            <View style={[styles.appIcon, { backgroundColor: C.primaryLight }]}>
-              <Text style={{ fontSize: 18 }}>🏢</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.appRole}>{a.role}</Text>
-              <Text style={styles.appCompany}>{a.company} · {a.time}</Text>
-            </View>
-            <View style={[styles.statusBadge, { backgroundColor: a.sc + '20' }]}>
-              <Text style={[styles.statusText, { color: a.sc }]}>{a.status}</Text>
-            </View>
+        {loadingApps ? (
+          <ActivityIndicator color={C.primary} style={{ padding: 24 }} />
+        ) : applications.length === 0 ? (
+          <View style={styles.emptyRow}>
+            <Text style={styles.emptyText}>No applications yet. Start tracking your job search!</Text>
           </View>
-        ))}
+        ) : (
+          applications.map((a, i) => {
+            const sc = STATUS_COLORS[a.status] || C.subtext;
+            return (
+              <View key={a.id} style={[styles.appRow, i < applications.length - 1 && styles.appRowBorder]}>
+                <View style={[styles.appIcon, { backgroundColor: C.primaryLight }]}>
+                  <Text style={{ fontSize: 18 }}>🏢</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.appRole}>{a.role}</Text>
+                  <Text style={styles.appCompany}>{a.company} · {timeAgo(a.applied_at)}</Text>
+                </View>
+                <View style={[styles.statusBadge, { backgroundColor: sc + '20' }]}>
+                  <Text style={[styles.statusText, { color: sc }]}>
+                    {STATUS_LABELS[a.status] || a.status}
+                  </Text>
+                </View>
+              </View>
+            );
+          })
+        )}
       </View>
 
-      {/* Resume Analysis */}
-      <Text style={styles.sectionTitle}>Resume Analysis</Text>
-      <View style={[styles.card, styles.resumeCard]}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.resumeName}>Senior_Developer_Resume.pdf</Text>
-          <Text style={styles.resumeSub}>Last updated · 3 days ago</Text>
-          <View style={styles.scoreBar}>
-            <View style={[styles.scoreBarFill, { width: '78%' }]} />
+      {/* Latest Analysis */}
+      {latestScore !== null && (
+        <>
+          <Text style={styles.sectionTitle}>Latest Analysis</Text>
+          <View style={[styles.card, styles.resumeCard]}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.resumeName}>Most Recent Gap Analysis</Text>
+              <Text style={styles.resumeSub}>Tap Analyze to run a new one</Text>
+              <View style={styles.scoreBar}>
+                <View style={[styles.scoreBarFill, { width: `${latestScore}%` }]} />
+              </View>
+              <Text style={styles.resumeScore}>ATS Score: {latestScore}%</Text>
+            </View>
+            <TouchableOpacity onPress={() => navigation.navigate('Analyze')}>
+              <Text style={styles.analyzeLink}>Analyze →</Text>
+            </TouchableOpacity>
           </View>
-          <Text style={styles.resumeScore}>ATS Score: 78%</Text>
-        </View>
-        <TouchableOpacity>
-          <Text style={styles.analyzeLink}>Analyze →</Text>
-        </TouchableOpacity>
-      </View>
+        </>
+      )}
     </ScrollView>
   );
 }
@@ -133,10 +190,7 @@ const styles = StyleSheet.create({
   sectionTitle: { color: C.text, fontSize: 17, fontWeight: '700', paddingHorizontal: 16, marginTop: 20, marginBottom: 10 },
   seeAll: { color: C.primary, fontSize: 13, fontWeight: '600' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, gap: 8 },
-  actionCard: {
-    width: '47%', borderRadius: 16, padding: 16, marginHorizontal: 2,
-    ...shadowSm, shadowColor: '#000',
-  },
+  actionCard: { width: '47%', borderRadius: 16, padding: 16, marginHorizontal: 2, ...shadowSm, shadowColor: '#000' },
   actionIcon: { fontSize: 28, marginBottom: 8 },
   actionLabel: { color: C.text, fontSize: 14, fontWeight: '700', marginBottom: 3 },
   actionSub: { color: C.subtext, fontSize: 12 },
@@ -148,6 +202,8 @@ const styles = StyleSheet.create({
   appCompany: { color: C.subtext, fontSize: 12, marginTop: 2 },
   statusBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
   statusText: { fontSize: 11, fontWeight: '700' },
+  emptyRow: { padding: 24, alignItems: 'center' },
+  emptyText: { color: C.subtext, fontSize: 13, textAlign: 'center', lineHeight: 20 },
   resumeCard: { padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 },
   resumeName: { color: C.text, fontSize: 13, fontWeight: '600' },
   resumeSub: { color: C.subtext, fontSize: 12, marginTop: 2, marginBottom: 8 },

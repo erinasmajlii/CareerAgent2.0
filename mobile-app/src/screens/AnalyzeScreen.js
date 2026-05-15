@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, ActivityIndicator, Keyboard, TouchableWithoutFeedback,
@@ -6,19 +6,35 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import * as DocumentPicker from 'expo-document-picker';
 import { C, GRAD, shadow, shadowSm } from '../theme';
-import { analyzeGap } from '../api';
+import { analyzeGap, fetchAnalyses } from '../api';
 
-const RECENT = [
-  { role: 'Senior Software Engineer', company: 'Google', pct: 78, time: '2h ago', color: '#10B981' },
-  { role: 'Staff Engineer', company: 'Meta', pct: 85, time: '1d ago', color: '#10B981' },
-  { role: 'Lead Developer', company: 'Stripe', pct: 62, time: '3d ago', color: '#F59E0B' },
-];
+function timeAgo(dateStr) {
+  if (!dateStr) return '';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return days < 7 ? `${days}d ago` : `${Math.floor(days / 7)}w ago`;
+}
 
 export default function AnalyzeScreen() {
   const [resumeFile, setResumeFile] = useState(null);
   const [jdText, setJdText] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const [recentAnalyses, setRecentAnalyses] = useState([]);
+  const [loadingRecent, setLoadingRecent] = useState(true);
+
+  const loadRecent = useCallback(async () => {
+    setLoadingRecent(true);
+    const data = await fetchAnalyses(5);
+    setRecentAnalyses(data);
+    setLoadingRecent(false);
+  }, []);
+
+  useEffect(() => { loadRecent(); }, [loadRecent]);
 
   const pickDoc = async () => {
     const res = await DocumentPicker.getDocumentAsync({ type: 'application/pdf' });
@@ -32,6 +48,8 @@ export default function AnalyzeScreen() {
     try {
       const data = await analyzeGap(resumeFile?.uri, jdText);
       setResult(data);
+      // Refresh recent list after new analysis
+      loadRecent();
     } catch {
       setResult({ match_score: 0, cheat_sheet: ['Analysis failed. Check backend connection.'] });
     } finally { setLoading(false); }
@@ -94,21 +112,31 @@ export default function AnalyzeScreen() {
 
         <View style={styles.sectionRow}>
           <Text style={styles.sectionTitle}>Recent Analyses</Text>
-          <TouchableOpacity><Text style={styles.seeAll}>See all</Text></TouchableOpacity>
         </View>
         <View style={styles.card}>
-          {RECENT.map((r, i) => (
-            <View key={i} style={[styles.recentRow, i < RECENT.length - 1 && styles.rowBorder]}>
-              <View style={styles.recentIcon}><Text>📄</Text></View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.recentRole}>{r.role}</Text>
-                <Text style={styles.recentCompany}>{r.company} · {r.time}</Text>
-              </View>
-              <View style={[styles.pctBadge, { backgroundColor: r.color + '22' }]}>
-                <Text style={[styles.pctText, { color: r.color }]}>{r.pct}%</Text>
-              </View>
+          {loadingRecent ? (
+            <ActivityIndicator color={C.primary} style={{ padding: 20 }} />
+          ) : recentAnalyses.length === 0 ? (
+            <View style={{ padding: 20, alignItems: 'center' }}>
+              <Text style={{ color: C.subtext, fontSize: 13 }}>No analyses yet. Run your first one above!</Text>
             </View>
-          ))}
+          ) : (
+            recentAnalyses.map((r, i) => {
+              const color = r.match_score >= 70 ? '#10B981' : '#F59E0B';
+              return (
+                <View key={r.id} style={[styles.recentRow, i < recentAnalyses.length - 1 && styles.rowBorder]}>
+                  <View style={styles.recentIcon}><Text>📄</Text></View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.recentRole}>{r.role || 'Gap Analysis'}</Text>
+                    <Text style={styles.recentCompany}>{r.company || 'Unknown company'} · {timeAgo(r.created_at)}</Text>
+                  </View>
+                  <View style={[styles.pctBadge, { backgroundColor: color + '22' }]}>
+                    <Text style={[styles.pctText, { color }]}>{r.match_score}%</Text>
+                  </View>
+                </View>
+              );
+            })
+          )}
         </View>
       </ScrollView>
     </TouchableWithoutFeedback>
@@ -138,7 +166,6 @@ const styles = StyleSheet.create({
   analyzeBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   sectionTitle: { fontSize: 17, fontWeight: '700', color: C.text },
-  seeAll: { color: C.primary, fontSize: 13, fontWeight: '600' },
   card: { backgroundColor: C.surface, borderRadius: 16, overflow: 'hidden', ...shadowSm, shadowColor: '#000' },
   recentRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   rowBorder: { borderBottomWidth: 1, borderBottomColor: C.border },

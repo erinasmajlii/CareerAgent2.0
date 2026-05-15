@@ -1,26 +1,46 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator,
 } from 'react-native';
 import { C, GRAD, shadowSm } from '../theme';
 import { LinearGradient } from 'expo-linear-gradient';
+import { fetchPrepSessions } from '../api';
 
 const CATEGORIES = [
-  { icon: '💻', label: 'Technical', count: 45, bg: '#EEF0FF', iconBg: C?.primary },
-  { icon: '🏗', label: 'System Design', count: 20, bg: '#ECFDF5', iconBg: '#10B981' },
-  { icon: '🧠', label: 'Behavioral', count: 30, bg: '#FEF3C7', iconBg: '#F59E0B' },
-  { icon: '🔧', label: 'Problem Solving', count: 18, bg: '#FEE2E2', iconBg: '#EF4444' },
-];
-
-const HISTORY = [
-  { session: 'System Design Session', status: 'Completed', score: '8/10', date: '2 days ago', color: '#10B981' },
-  { session: 'Behavioral Questions', status: 'Completed', score: '7/10', date: '4 days ago', color: '#10B981' },
-  { session: 'Design Session', status: 'In Progress', score: '4/10', date: '1 week ago', color: '#F59E0B' },
+  { icon: '💻', label: 'Technical', count: 45, bg: '#EEF0FF' },
+  { icon: '🏗', label: 'System Design', count: 20, bg: '#ECFDF5' },
+  { icon: '🧠', label: 'Behavioral', count: 30, bg: '#FEF3C7' },
+  { icon: '🔧', label: 'Problem Solving', count: 18, bg: '#FEE2E2' },
 ];
 
 const TODAY_Q = 'Explain the difference between let, var, and const in JavaScript.';
 
+const STATUS_COLORS = { completed: '#10B981', in_progress: '#F59E0B' };
+const STATUS_LABELS = { completed: 'Completed', in_progress: 'In Progress' };
+
+function timeAgo(dateStr) {
+  if (!dateStr) return '';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const days = Math.floor(diff / 86400000);
+  if (days === 0) return 'Today';
+  if (days === 1) return '1 day ago';
+  if (days < 7) return `${days} days ago`;
+  return `${Math.floor(days / 7)} week${Math.floor(days / 7) > 1 ? 's' : ''} ago`;
+}
+
 export default function PrepScreen({ navigation }) {
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadHistory = useCallback(async () => {
+    setLoading(true);
+    const data = await fetchPrepSessions(5);
+    setHistory(data);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadHistory(); }, [loadHistory]);
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <Text style={styles.pageTitle}>Interview Prep</Text>
@@ -67,20 +87,33 @@ export default function PrepScreen({ navigation }) {
       {/* Practice History */}
       <Text style={styles.sectionTitle}>Practice History</Text>
       <View style={styles.card}>
-        {HISTORY.map((h, i) => (
-          <View key={i} style={[styles.histRow, i < HISTORY.length - 1 && styles.rowBorder]}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.histSession}>{h.session}</Text>
-              <Text style={styles.histDate}>{h.date}</Text>
-            </View>
-            <View style={{ alignItems: 'flex-end', gap: 4 }}>
-              <View style={[styles.statusBadge, { backgroundColor: h.color + '20' }]}>
-                <Text style={[styles.statusText, { color: h.color }]}>{h.status}</Text>
-              </View>
-              <Text style={styles.histScore}>{h.score}</Text>
-            </View>
+        {loading ? (
+          <ActivityIndicator color={C.primary} style={{ padding: 20 }} />
+        ) : history.length === 0 ? (
+          <View style={{ padding: 20, alignItems: 'center' }}>
+            <Text style={{ color: C.subtext, fontSize: 13, textAlign: 'center' }}>
+              No sessions yet. Start a practice session above!
+            </Text>
           </View>
-        ))}
+        ) : (
+          history.map((h, i) => {
+            const color = STATUS_COLORS[h.status] || C.subtext;
+            return (
+              <View key={h.id} style={[styles.histRow, i < history.length - 1 && styles.rowBorder]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.histSession}>{h.category} Session</Text>
+                  <Text style={styles.histDate}>{timeAgo(h.created_at)}</Text>
+                </View>
+                <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                  <View style={[styles.statusBadge, { backgroundColor: color + '20' }]}>
+                    <Text style={[styles.statusText, { color }]}>{STATUS_LABELS[h.status] || h.status}</Text>
+                  </View>
+                  {h.score ? <Text style={styles.histScore}>{h.score}</Text> : null}
+                </View>
+              </View>
+            );
+          })
+        )}
       </View>
     </ScrollView>
   );
@@ -95,10 +128,7 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 17, fontWeight: '700', color: C.text, marginBottom: 10 },
   seeAll: { color: C.primary, fontSize: 13, fontWeight: '600' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
-  catCard: {
-    width: '47%', borderRadius: 16, padding: 18,
-    ...shadowSm, shadowColor: '#000',
-  },
+  catCard: { width: '47%', borderRadius: 16, padding: 18, ...shadowSm, shadowColor: '#000' },
   catIcon: { fontSize: 32, marginBottom: 10 },
   catLabel: { color: C.text, fontSize: 15, fontWeight: '700', marginBottom: 4 },
   catCount: { color: C.subtext, fontSize: 12 },
