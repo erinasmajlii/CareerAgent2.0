@@ -46,7 +46,7 @@ export default function PrepScreen({ navigation }) {
   ];
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={[styles.content, { paddingTop: insets.top + 68, paddingBottom: 110 }]} showsVerticalScrollIndicator={false}>
+    <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={[styles.content, { paddingTop: insets.top + 20, paddingBottom: 110 }]} showsVerticalScrollIndicator={false}>
 
       <Text style={[styles.pageTitle, { color: C.text }]}>Interview Prep</Text>
       <Text style={[styles.pageSub, { color: C.subtext }]}>AI-generated practice questions, tailored for you</Text>

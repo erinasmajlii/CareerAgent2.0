@@ -72,7 +72,7 @@ export default function ChatBotScreen({ navigation }) {
       style={[styles.container, { backgroundColor: C.bg }]}
     >
       {/* Header */}
-      <LinearGradient colors={GRAD} style={[styles.header, { paddingTop: insets.top + 16 }]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+      <LinearGradient colors={GRAD} style={[styles.header, { paddingTop: insets.top + 8 }]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>

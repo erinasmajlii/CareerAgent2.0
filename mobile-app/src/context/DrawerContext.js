@@ -2,7 +2,7 @@ import React, { createContext, useContext, useRef, useState, useCallback } from 
 import { Animated, Dimensions, Easing } from 'react-native';
 
 const { width } = Dimensions.get('window');
-export const DRAWER_WIDTH = width * 0.5;
+export const DRAWER_WIDTH = width * 0.72;
 
 const DrawerContext = createContext(null);
 

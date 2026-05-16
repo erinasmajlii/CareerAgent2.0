@@ -71,7 +71,7 @@ export default function GenerateScreen() {
   return (
     <ScrollView
       style={[S.container, { backgroundColor: C.bg }]}
-      contentContainerStyle={[S.content, { paddingTop: insets.top + 68 }]}
+      contentContainerStyle={[S.content, { paddingTop: insets.top + 20 }]}
       keyboardShouldPersistTaps="handled"
     >
       <Text style={[S.pageTitle, { color: C.text }]}>Resume Optimizer</Text>

@@ -95,7 +95,7 @@ export default function AnalyzeScreen() {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: C.bg }}
-      contentContainerStyle={[styles.content, { paddingTop: insets.top + 68, paddingBottom: 110 }]}
+      contentContainerStyle={[styles.content, { paddingTop: insets.top + 20, paddingBottom: 110 }]}
       keyboardShouldPersistTaps="handled"
     >
       <Text style={[styles.pageTitle, { color: C.text }]}>Analyze Job</Text>

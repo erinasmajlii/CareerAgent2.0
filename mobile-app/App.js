@@ -112,7 +112,11 @@ function AppShell() {
   const { isDark, colors } = useTheme();
   return (
     <>
-      <StatusBar hidden />
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        barStyle={isDark ? 'light-content' : 'dark-content'}
+      />
       <NavigationContainer>
         <RootNavigator />
       </NavigationContainer>

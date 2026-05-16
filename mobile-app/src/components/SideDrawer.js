@@ -11,13 +11,11 @@ import { useDrawer, DRAWER_WIDTH } from '../context/DrawerContext';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 
-// Profile & Prep are TABS → navigate directly by name (RN6 traverses hierarchy)
-// ChatBot & Settings are STACK screens → navigate directly by name
 const MENU_ITEMS = [
-  { icon: '◉',  label: 'Profile',         nav: 'Profile',  isTab: true  },
-  { icon: '📚', label: 'Interview Prep',   nav: 'Prep',     isTab: true  },
-  { icon: '🤖', label: 'CareerAgent Bot',  nav: 'ChatBot',  isTab: false },
-  { icon: '⚙️', label: 'Settings',         nav: 'Settings', isTab: false },
+  { icon: '◉',  label: 'Profile',         nav: 'Profile'  },
+  { icon: '📚', label: 'Interview Prep',   nav: 'Prep'     },
+  { icon: '🤖', label: 'CareerAgent Bot',  nav: 'ChatBot'  },
+  { icon: '⚙️', label: 'Settings',         nav: 'Settings' },
 ];
 
 export default function SideDrawer() {
@@ -38,86 +36,123 @@ export default function SideDrawer() {
     setTimeout(() => navigation.navigate(screen), 160);
   };
 
+  // overlayOpacity is already an Animated.Interpolation (derived from translateX).
+  // We just use it directly — values go 0→1 as drawer opens.
+  // Map it to 0→0.55 darkness using a second interpolation on the raw translateX.
+  const dimOpacity = translateX.interpolate({
+    inputRange: [-DRAWER_WIDTH, 0],
+    outputRange: [0, 0.62],
+    extrapolate: 'clamp',
+  });
+
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-      {/* Dimmed overlay */}
+      {/* ── Dimmed + Blurred Overlay ── */}
       <TouchableWithoutFeedback onPress={close}>
-        <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]}>
-          <Animated.View style={[StyleSheet.absoluteFill, { opacity: overlayOpacity.interpolate
-            ? overlayOpacity.interpolate({ inputRange: [0, 1], outputRange: [0, 0.55] })
-            : 0.45 }]}
-          >
-            <BlurView intensity={isDark ? 20 : 10} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
-          </Animated.View>
-        </Animated.View>
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: isDark ? '#000' : '#1A1233', opacity: dimOpacity },
+          ]}
+        />
       </TouchableWithoutFeedback>
 
-      {/* Drawer Panel */}
+      {/* ── Drawer Panel ── */}
       <Animated.View
         style={[
           styles.drawer,
           {
             width: DRAWER_WIDTH,
-            backgroundColor: isDark ? 'rgba(10,10,20,0.97)' : 'rgba(255,255,255,0.97)',
-            borderRightColor: isDark ? 'rgba(139,127,255,0.3)' : 'rgba(108,99,255,0.12)',
+            backgroundColor: isDark ? 'rgba(8,8,18,0.98)' : 'rgba(255,255,255,0.98)',
+            borderRightColor: isDark ? 'rgba(139,127,255,0.25)' : 'rgba(108,99,255,0.1)',
             transform: [{ translateX }],
-            paddingTop: insets.top,
-            paddingBottom: insets.bottom + 16,
+            paddingTop: insets.top + 8,
+            paddingBottom: insets.bottom + 20,
             shadowColor: '#8B7FFF',
-            shadowOffset: { width: 6, height: 0 },
-            shadowOpacity: isDark ? 0.4 : 0.15,
-            shadowRadius: 20,
+            shadowOffset: { width: 8, height: 0 },
+            shadowOpacity: isDark ? 0.5 : 0.18,
+            shadowRadius: 24,
+            elevation: 30,
           },
         ]}
       >
-        {/* Glow accent line */}
+        {/* Right-edge purple glow line */}
         {isDark && (
           <LinearGradient
-            colors={['transparent', 'rgba(139,127,255,0.5)', 'transparent']}
+            colors={['transparent', 'rgba(139,127,255,0.45)', 'transparent']}
             style={styles.glowLine}
             start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
           />
         )}
 
-        {/* Header */}
+        {/* ── Profile Header ── */}
         <LinearGradient
-          colors={isDark ? ['#13121F', '#0A0A14'] : GRAD}
+          colors={isDark ? ['rgba(139,127,255,0.14)', 'rgba(10,10,20,0)'] : ['rgba(108,99,255,0.1)', 'rgba(108,99,255,0)']}
           style={styles.drawerHeader}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
         >
-          <View style={[styles.avatar, { borderColor: isDark ? 'rgba(139,127,255,0.6)' : 'rgba(255,255,255,0.5)', shadowColor: '#8B7FFF', shadowOpacity: isDark ? 0.8 : 0, shadowRadius: 12, shadowOffset: { width: 0, height: 0 } }]}>
-            <Text style={[styles.avatarText, { color: isDark ? C.primary : '#fff' }]}>{initial}</Text>
+          <View style={[
+            styles.avatar,
+            {
+              borderColor: isDark ? 'rgba(139,127,255,0.7)' : C.primary,
+              shadowColor: '#8B7FFF',
+              shadowOpacity: isDark ? 0.9 : 0.3,
+              shadowRadius: 14,
+              shadowOffset: { width: 0, height: 0 },
+            },
+          ]}>
+            <LinearGradient
+              colors={GRAD}
+              style={styles.avatarGrad}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            >
+              <Text style={styles.avatarText}>{initial}</Text>
+            </LinearGradient>
           </View>
-          <Text style={[styles.drawerName, { color: isDark ? C.text : '#fff' }]} numberOfLines={1}>{displayName}</Text>
-          <Text style={[styles.drawerSub, { color: isDark ? C.subtext : 'rgba(255,255,255,0.7)' }]} numberOfLines={1}>{targetTitle}</Text>
+          <Text style={[styles.drawerName, { color: C.text }]} numberOfLines={1}>{displayName}</Text>
+          <Text style={[styles.drawerSub, { color: C.subtext }]} numberOfLines={1}>{targetTitle}</Text>
+
+          {/* Edit Profile pill */}
+          <TouchableOpacity
+            onPress={() => go('Profile')}
+            style={[styles.editPill, { backgroundColor: isDark ? 'rgba(139,127,255,0.15)' : C.primaryLight, borderColor: isDark ? 'rgba(139,127,255,0.35)' : C.primary + '40' }]}
+          >
+            <Text style={[styles.editPillText, { color: C.primary }]}>✏️  Edit Profile</Text>
+          </TouchableOpacity>
         </LinearGradient>
 
-        {/* Menu */}
-        <View style={{ flex: 1, paddingTop: 12 }}>
-          {MENU_ITEMS.map((item) => (
+        {/* ── Divider ── */}
+        <View style={[styles.divider, { backgroundColor: isDark ? 'rgba(139,127,255,0.1)' : 'rgba(0,0,0,0.06)' }]} />
+
+        {/* ── Menu Items ── */}
+        <View style={{ flex: 1, paddingTop: 8 }}>
+          {MENU_ITEMS.map((item, idx) => (
             <TouchableOpacity
               key={item.nav}
               style={[
                 styles.menuItem,
-                { borderBottomColor: isDark ? 'rgba(139,127,255,0.08)' : 'rgba(0,0,0,0.05)' },
+                { borderBottomColor: isDark ? 'rgba(139,127,255,0.07)' : 'rgba(0,0,0,0.04)' },
               ]}
               onPress={() => go(item.nav)}
-              activeOpacity={0.7}
+              activeOpacity={0.65}
             >
-              <View style={[styles.menuIconWrap, { backgroundColor: isDark ? 'rgba(139,127,255,0.12)' : C.primaryLight }]}>
-                <Text style={{ fontSize: 15 }}>{item.icon}</Text>
+              <View style={[
+                styles.menuIconWrap,
+                { backgroundColor: isDark ? 'rgba(139,127,255,0.13)' : C.primaryLight + 'CC' },
+              ]}>
+                <Text style={{ fontSize: 16 }}>{item.icon}</Text>
               </View>
               <Text style={[styles.menuLabel, { color: C.text }]}>{item.label}</Text>
-              <Text style={[styles.chevron, { color: isDark ? 'rgba(139,127,255,0.5)' : C.subtext }]}>›</Text>
+              <Text style={[styles.chevron, { color: isDark ? 'rgba(139,127,255,0.45)' : C.subtext }]}>›</Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* Footer */}
-        <View style={styles.footer}>
-          <TouchableOpacity><Text style={[styles.footerText, { color: C.subtext }]}>Terms</Text></TouchableOpacity>
-          <Text style={[styles.footerDot, { color: C.border }]}>·</Text>
-          <TouchableOpacity><Text style={[styles.footerText, { color: C.subtext }]}>Privacy</Text></TouchableOpacity>
+        {/* ── Footer ── */}
+        <View style={[styles.footer, { borderTopColor: isDark ? 'rgba(139,127,255,0.08)' : 'rgba(0,0,0,0.05)' }]}>
+          <View style={[styles.versionBadge, { backgroundColor: isDark ? 'rgba(139,127,255,0.1)' : C.primaryLight }]}>
+            <Text style={[styles.versionText, { color: C.primary }]}>✦ CareerAgent v2.0</Text>
+          </View>
         </View>
       </Animated.View>
     </View>
@@ -127,28 +162,39 @@ export default function SideDrawer() {
 const styles = StyleSheet.create({
   drawer: {
     position: 'absolute', top: 0, left: 0, bottom: 0,
-    borderRightWidth: 1, elevation: 25,
+    borderRightWidth: 1,
   },
-  glowLine:    { position: 'absolute', right: 0, top: 0, bottom: 0, width: 1 },
-  drawerHeader:{ padding: 20, paddingBottom: 22 },
+  glowLine:     { position: 'absolute', right: 0, top: 0, bottom: 0, width: 1 },
+  drawerHeader: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 24 },
   avatar: {
-    width: 54, height: 54, borderRadius: 27,
-    backgroundColor: 'rgba(139,127,255,0.15)',
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: 10, borderWidth: 2, elevation: 0,
+    width: 62, height: 62, borderRadius: 31,
+    marginBottom: 12, borderWidth: 2, elevation: 0,
+    overflow: 'hidden',
   },
-  avatarText:   { fontSize: 24, fontWeight: '900' },
-  drawerName:   { fontSize: 14, fontWeight: '800', marginBottom: 2 },
-  drawerSub:    { fontSize: 11 },
+  avatarGrad:   { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  avatarText:   { fontSize: 26, fontWeight: '900', color: '#fff' },
+  drawerName:   { fontSize: 15, fontWeight: '800', marginBottom: 3 },
+  drawerSub:    { fontSize: 12, marginBottom: 14 },
+  editPill: {
+    alignSelf: 'flex-start',
+    borderRadius: 20, borderWidth: 1,
+    paddingHorizontal: 14, paddingVertical: 7,
+  },
+  editPillText: { fontSize: 12, fontWeight: '700' },
+  divider:      { height: 1, marginHorizontal: 16, marginBottom: 4 },
   menuItem: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingHorizontal: 16, paddingVertical: 13,
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    paddingHorizontal: 18, paddingVertical: 15,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  menuIconWrap: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  menuLabel:    { flex: 1, fontSize: 14, fontWeight: '600' },
-  chevron:      { fontSize: 20 },
-  footer:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingTop: 12, paddingHorizontal: 12 },
-  footerText:   { fontSize: 10 },
-  footerDot:    { fontSize: 10 },
+  menuIconWrap: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  menuLabel:    { flex: 1, fontSize: 15, fontWeight: '600', letterSpacing: 0.1 },
+  chevron:      { fontSize: 22, marginRight: -2 },
+  footer: {
+    paddingTop: 14, paddingHorizontal: 18,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+  },
+  versionBadge: { borderRadius: 20, paddingHorizontal: 16, paddingVertical: 7 },
+  versionText:  { fontSize: 11, fontWeight: '700', letterSpacing: 0.3 },
 });

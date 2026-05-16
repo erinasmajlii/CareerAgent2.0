@@ -46,7 +46,7 @@ export default function ProfileScreen({ navigation }) {
     <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ paddingBottom: 110 }} showsVerticalScrollIndicator={false}>
 
       {/* ── Profile Header ── */}
-      <LinearGradient colors={isDark ? ['#13121F', '#0A0A1A'] : GRAD} style={[styles.headerGrad, { paddingTop: insets.top + 68 }]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+      <LinearGradient colors={isDark ? ['#13121F', '#0A0A1A'] : GRAD} style={[styles.headerGrad, { paddingTop: insets.top + 20 }]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
         {/* Avatar with neon glow ring */}
         <View style={[
           styles.avatarRing,
