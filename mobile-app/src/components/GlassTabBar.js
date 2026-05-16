@@ -73,9 +73,9 @@ export default function GlassTabBar({ state, navigation }) {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.wrapper, { paddingBottom: insets.bottom }]}>
+    <View style={styles.wrapper}>
       <BlurView intensity={isDark ? 60 : 75} tint={isDark ? 'dark' : 'light'} style={[styles.container, { borderTopColor: C.tabBorder }]}>
-        <View style={[styles.inner, { backgroundColor: C.tabBar }]}>
+        <View style={[styles.inner, { backgroundColor: C.tabBar, paddingBottom: insets.bottom > 0 ? insets.bottom : 6 }]}>
           {/* Burger — leftmost */}
           <BurgerTab />
           {/* Tab screens */}
@@ -101,7 +101,7 @@ export default function GlassTabBar({ state, navigation }) {
 const styles = StyleSheet.create({
   wrapper: { position: 'absolute', bottom: 0, left: 0, right: 0 },
   container: { borderTopWidth: 1 },
-  inner: { flexDirection: 'row', paddingTop: 10, paddingBottom: 6 },
+  inner: { flexDirection: 'row', paddingTop: 10 },
   tabBtn: { flex: 1, alignItems: 'center' },
   tabInner: { alignItems: 'center', gap: 3, paddingVertical: 5, paddingHorizontal: 10, position: 'relative' },
   aura: { position: 'absolute', top: -6, left: -14, right: -14, bottom: -6, borderRadius: 20, elevation: 0 },

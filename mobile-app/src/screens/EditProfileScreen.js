@@ -11,7 +11,7 @@ import { supabase } from '../supabase';
 
 export default function EditProfileScreen({ navigation }) {
   const { colors: C, gradient: GRAD, isDark, shadowSm } = useTheme();
-  const { profile, user } = useAuth();
+  const { profile, user, refetchProfile } = useAuth();
   const insets = useSafeAreaInsets();
 
   const [fullName,     setFullName]     = useState(profile?.full_name     || '');
@@ -30,6 +30,7 @@ export default function EditProfileScreen({ navigation }) {
         .upsert({ id: user.id, full_name: fullName.trim(), target_title: targetTitle.trim() });
       if (error) throw error;
       Alert.alert('✓ Saved', 'Your profile has been updated.');
+      await refetchProfile();
       navigation.goBack();
     } catch (e) {
       Alert.alert('Error', e.message || 'Could not save profile.');
