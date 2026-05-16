@@ -6,15 +6,15 @@ import { useTheme } from '../context/ThemeContext';
 import { useDrawer } from '../context/DrawerContext';
 
 const TABS = [
-  { name: 'Home',     icon: '⌂',  label: 'Home'     },
-  { name: 'Analyze',  icon: '🔍', label: 'Analyze'  },
-  { name: 'Generate', icon: '✦',  label: 'Generate' },
+  { name: 'Home', icon: '⌂', label: 'Home' },
+  { name: 'Analyze', icon: '🔍', label: 'Analyze' },
+  { name: 'Generate', icon: '✦', label: 'Generate' },
 ];
 
 function AnimatedTabBtn({ onPress, focused, icon, label }) {
   const { colors: C, isDark } = useTheme();
   const scale = useRef(new Animated.Value(1)).current;
-  const pressIn  = () => Animated.spring(scale, { toValue: 0.85, useNativeDriver: true, speed: 32 }).start();
+  const pressIn = () => Animated.spring(scale, { toValue: 0.85, useNativeDriver: true, speed: 32 }).start();
   const pressOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 10 }).start();
 
   return (
@@ -45,7 +45,7 @@ function BurgerTab() {
   const { toggle, isOpen } = useDrawer();
   const { colors: C, isDark } = useTheme();
   const scale = useRef(new Animated.Value(1)).current;
-  const pressIn  = () => Animated.spring(scale, { toValue: 0.85, useNativeDriver: true, speed: 32 }).start();
+  const pressIn = () => Animated.spring(scale, { toValue: 0.85, useNativeDriver: true, speed: 32 }).start();
   const pressOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 10 }).start();
 
   return (
@@ -99,15 +99,15 @@ export default function GlassTabBar({ state, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  wrapper:    { position: 'absolute', bottom: 0, left: 0, right: 0 },
-  container:  { borderTopWidth: 1 },
-  inner:      { flexDirection: 'row', paddingTop: 10, paddingBottom: 6 },
-  tabBtn:     { flex: 1, alignItems: 'center' },
-  tabInner:   { alignItems: 'center', gap: 3, paddingVertical: 5, paddingHorizontal: 10, position: 'relative' },
-  aura:       { position: 'absolute', top: -6, left: -14, right: -14, bottom: -6, borderRadius: 20, elevation: 0 },
-  tabIcon:    { fontSize: 21, zIndex: 1 },
-  tabLabel:   { fontSize: 9, zIndex: 1 },
-  burgerLines:{ width: 22, height: 21, justifyContent: 'center', gap: 4, zIndex: 1 },
-  line:       { height: 2, borderRadius: 2, width: '100%' },
-  lineMid:    { width: '70%' },
+  wrapper: { position: 'absolute', bottom: 0, left: 0, right: 0 },
+  container: { borderTopWidth: 1 },
+  inner: { flexDirection: 'row', paddingTop: 10, paddingBottom: 6 },
+  tabBtn: { flex: 1, alignItems: 'center' },
+  tabInner: { alignItems: 'center', gap: 3, paddingVertical: 5, paddingHorizontal: 10, position: 'relative' },
+  aura: { position: 'absolute', top: -6, left: -14, right: -14, bottom: -6, borderRadius: 20, elevation: 0 },
+  tabIcon: { fontSize: 21, zIndex: 1 },
+  tabLabel: { fontSize: 9, zIndex: 1 },
+  burgerLines: { width: 22, height: 21, justifyContent: 'center', gap: 4, zIndex: 1 },
+  line: { height: 2, borderRadius: 2, width: '100%' },
+  lineMid: { width: '70%' },
 });
