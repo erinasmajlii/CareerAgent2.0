@@ -2,113 +2,127 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator,
 } from 'react-native';
-import { C, GRAD, shadowSm } from '../theme';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from '../context/ThemeContext';
 import { fetchPrepSessions } from '../api';
 
 const CATEGORIES = [
-  { icon: '💻', label: 'Technical', count: 45, bg: '#EEF0FF' },
-  { icon: '🏗', label: 'System Design', count: 20, bg: '#ECFDF5' },
-  { icon: '🧠', label: 'Behavioral', count: 30, bg: '#FEF3C7' },
-  { icon: '🔧', label: 'Problem Solving', count: 18, bg: '#FEE2E2' },
+  { icon: '💻', label: 'Technical',      count: 45, col: '#8B7FFF' },
+  { icon: '🏗',  label: 'System Design',  count: 20, col: '#10B981' },
+  { icon: '🧠', label: 'Behavioral',     count: 30, col: '#F59E0B' },
+  { icon: '🔧', label: 'Problem Solving', count: 18, col: '#EF4444' },
 ];
 
-const TODAY_Q = 'Explain the difference between let, var, and const in JavaScript.';
+const TODAY_Q   = 'Explain the difference between let, var, and const in JavaScript.';
+const STATUS_C  = { completed: '#10B981', in_progress: '#F59E0B' };
+const STATUS_L  = { completed: 'Completed', in_progress: 'In Progress' };
 
-const STATUS_COLORS = { completed: '#10B981', in_progress: '#F59E0B' };
-const STATUS_LABELS = { completed: 'Completed', in_progress: 'In Progress' };
-
-function timeAgo(dateStr) {
-  if (!dateStr) return '';
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const days = Math.floor(diff / 86400000);
-  if (days === 0) return 'Today';
-  if (days === 1) return '1 day ago';
-  if (days < 7) return `${days} days ago`;
-  return `${Math.floor(days / 7)} week${Math.floor(days / 7) > 1 ? 's' : ''} ago`;
+function timeSince(d) {
+  if (!d) return '';
+  const days = Math.floor((Date.now() - new Date(d)) / 86400000);
+  return days === 0 ? 'Today' : days === 1 ? '1 day ago' : `${days} days ago`;
 }
 
 export default function PrepScreen({ navigation }) {
+  const { colors: C, gradient: GRAD, isDark, shadowSm } = useTheme();
+  const insets = useSafeAreaInsets();
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const loadHistory = useCallback(async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     const data = await fetchPrepSessions(5);
-    setHistory(data);
-    setLoading(false);
+    setHistory(data); setLoading(false);
   }, []);
 
-  useEffect(() => { loadHistory(); }, [loadHistory]);
+  useEffect(() => { load(); }, [load]);
+
+  const glass = (accentColor) => [
+    styles.glassCard,
+    isDark
+      ? { backgroundColor: accentColor ? accentColor + '12' : 'rgba(139,127,255,0.06)', borderColor: accentColor ? accentColor + '35' : 'rgba(139,127,255,0.22)', borderWidth: 1 }
+      : { backgroundColor: '#fff', ...shadowSm },
+  ];
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      <Text style={styles.pageTitle}>Interview Prep</Text>
-      <Text style={styles.pageSubtitle}>Practice with AI-generated questions</Text>
+    <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={[styles.content, { paddingTop: insets.top + 68, paddingBottom: 110 }]} showsVerticalScrollIndicator={false}>
 
-      {/* Categories Grid */}
-      <Text style={styles.sectionTitle}>Question Categories</Text>
+      <Text style={[styles.pageTitle, { color: C.text }]}>Interview Prep</Text>
+      <Text style={[styles.pageSub, { color: C.subtext }]}>AI-generated practice questions, tailored for you</Text>
+
+      {/* ── Categories Grid ── */}
+      <Text style={[styles.sectionTitle, { color: C.text }]}>Question Categories</Text>
       <View style={styles.grid}>
         {CATEGORIES.map((cat, i) => (
           <TouchableOpacity
             key={i}
-            style={[styles.catCard, { backgroundColor: cat.bg }]}
             onPress={() => navigation.navigate('Question', { category: cat.label })}
             activeOpacity={0.8}
+            style={[
+              styles.catCard,
+              isDark
+                ? { backgroundColor: cat.col + '14', borderColor: cat.col + '40', borderWidth: 1, shadowColor: cat.col, shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 0 }, elevation: 0 }
+                : { backgroundColor: cat.col + '10', ...shadowSm },
+            ]}
           >
             <Text style={styles.catIcon}>{cat.icon}</Text>
-            <Text style={styles.catLabel}>{cat.label}</Text>
-            <Text style={styles.catCount}>{cat.count} questions</Text>
+            <Text style={[styles.catLabel, { color: C.text }]}>{cat.label}</Text>
+            <Text style={[styles.catCount, { color: cat.col }]}>{cat.count} Qs</Text>
+            <View style={[styles.startBtn, { backgroundColor: cat.col + '22', borderColor: cat.col + '55', borderWidth: 1 }]}>
+              <Text style={{ color: cat.col, fontSize: 12, fontWeight: '700' }}>Start →</Text>
+            </View>
           </TouchableOpacity>
         ))}
       </View>
 
-      {/* Today's Practice */}
-      <View style={styles.sectionRow}>
-        <Text style={styles.sectionTitle}>Today's Practice</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('Question', { category: 'Technical' })}>
-          <Text style={styles.seeAll}>See all</Text>
-        </TouchableOpacity>
-      </View>
+      {/* ── Today's Challenge ── */}
+      <Text style={[styles.sectionTitle, { color: C.text }]}>Today's Challenge</Text>
       <TouchableOpacity
-        style={styles.todayCard}
         onPress={() => navigation.navigate('Question', { category: 'Technical' })}
         activeOpacity={0.85}
+        style={[styles.todayCard, { overflow: 'hidden' }]}
       >
         <LinearGradient colors={GRAD} style={styles.todayGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+          {isDark && (
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.3)' }]} />
+          )}
           <View style={styles.todayBadge}>
-            <Text style={styles.todayBadgeText}>Technical · Easy</Text>
+            <Text style={styles.todayBadgeText}>🔥 Technical · Easy</Text>
           </View>
           <Text style={styles.todayQ}>{TODAY_Q}</Text>
-          <Text style={styles.todayAction}>Start Practice →</Text>
+          <View style={styles.todayFooter}>
+            <Text style={styles.todayAction}>Practice Now →</Text>
+          </View>
         </LinearGradient>
       </TouchableOpacity>
 
-      {/* Practice History */}
-      <Text style={styles.sectionTitle}>Practice History</Text>
-      <View style={styles.card}>
+      {/* ── Practice History ── */}
+      <Text style={[styles.sectionTitle, { color: C.text }]}>Practice History</Text>
+      <View style={[...glass(), { overflow: 'hidden', gap: 0 }]}>
         {loading ? (
           <ActivityIndicator color={C.primary} style={{ padding: 20 }} />
         ) : history.length === 0 ? (
-          <View style={{ padding: 20, alignItems: 'center' }}>
+          <View style={{ padding: 28, alignItems: 'center' }}>
+            <Text style={{ fontSize: 30, marginBottom: 8 }}>📚</Text>
             <Text style={{ color: C.subtext, fontSize: 13, textAlign: 'center' }}>
-              No sessions yet. Start a practice session above!
+              No sessions yet.{'\n'}Pick a category above!
             </Text>
           </View>
         ) : (
           history.map((h, i) => {
-            const color = STATUS_COLORS[h.status] || C.subtext;
+            const color = STATUS_C[h.status] || C.subtext;
             return (
-              <View key={h.id} style={[styles.histRow, i < history.length - 1 && styles.rowBorder]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.histSession}>{h.category} Session</Text>
-                  <Text style={styles.histDate}>{timeAgo(h.created_at)}</Text>
+              <View key={h.id} style={[styles.histRow, i < history.length - 1 && { borderBottomWidth: 1, borderBottomColor: C.border }]}>
+                <View style={[styles.histIcon, { backgroundColor: color + '22', shadowColor: isDark ? color : 'transparent', shadowOpacity: 0.5, shadowRadius: 8, shadowOffset: { width: 0, height: 0 }, elevation: 0 }]}>
+                  <Text style={{ fontSize: 18 }}>🎯</Text>
                 </View>
-                <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                  <View style={[styles.statusBadge, { backgroundColor: color + '20' }]}>
-                    <Text style={[styles.statusText, { color }]}>{STATUS_LABELS[h.status] || h.status}</Text>
-                  </View>
-                  {h.score ? <Text style={styles.histScore}>{h.score}</Text> : null}
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.histTitle, { color: C.text }]}>{h.category || 'Practice'} Session</Text>
+                  <Text style={[styles.histDate, { color: C.subtext }]}>{timeSince(h.created_at)}</Text>
+                </View>
+                <View style={[styles.statusBadge, { backgroundColor: color + '22' }]}>
+                  <Text style={[styles.statusText, { color }]}>{STATUS_L[h.status] || h.status}</Text>
                 </View>
               </View>
             );
@@ -120,30 +134,28 @@ export default function PrepScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: C.bg },
-  content: { padding: 16, paddingBottom: 40 },
-  pageTitle: { fontSize: 24, fontWeight: '800', color: C.text, marginBottom: 6 },
-  pageSubtitle: { fontSize: 14, color: C.subtext, marginBottom: 20 },
-  sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  sectionTitle: { fontSize: 17, fontWeight: '700', color: C.text, marginBottom: 10 },
-  seeAll: { color: C.primary, fontSize: 13, fontWeight: '600' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
-  catCard: { width: '47%', borderRadius: 16, padding: 18, ...shadowSm, shadowColor: '#000' },
-  catIcon: { fontSize: 32, marginBottom: 10 },
-  catLabel: { color: C.text, fontSize: 15, fontWeight: '700', marginBottom: 4 },
-  catCount: { color: C.subtext, fontSize: 12 },
-  todayCard: { borderRadius: 18, overflow: 'hidden', marginBottom: 24, ...shadowSm },
-  todayGrad: { padding: 20 },
-  todayBadge: { alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.25)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4, marginBottom: 12 },
-  todayBadgeText: { color: '#fff', fontSize: 12, fontWeight: '600' },
-  todayQ: { color: '#fff', fontSize: 16, fontWeight: '700', lineHeight: 24, marginBottom: 16 },
-  todayAction: { color: 'rgba(255,255,255,0.9)', fontSize: 14, fontWeight: '600' },
-  card: { backgroundColor: C.surface, borderRadius: 16, overflow: 'hidden', ...shadowSm, shadowColor: '#000' },
-  histRow: { flexDirection: 'row', alignItems: 'center', padding: 14 },
-  rowBorder: { borderBottomWidth: 1, borderBottomColor: C.border },
-  histSession: { color: C.text, fontSize: 14, fontWeight: '600' },
-  histDate: { color: C.subtext, fontSize: 12, marginTop: 2 },
-  statusBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3 },
-  statusText: { fontSize: 11, fontWeight: '700' },
-  histScore: { color: C.primary, fontSize: 13, fontWeight: '700' },
+  content:       { paddingHorizontal: 18 },
+  pageTitle:     { fontSize: 24, fontWeight: '800', marginBottom: 5, letterSpacing: -0.5 },
+  pageSub:       { fontSize: 13, marginBottom: 22, lineHeight: 19 },
+  sectionTitle:  { fontSize: 17, fontWeight: '800', marginBottom: 12, letterSpacing: -0.2 },
+  grid:          { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 26 },
+  catCard:       { width: '47%', borderRadius: 20, padding: 18, gap: 6 },
+  catIcon:       { fontSize: 30, marginBottom: 4 },
+  catLabel:      { fontSize: 14, fontWeight: '800' },
+  catCount:      { fontSize: 12, fontWeight: '600' },
+  startBtn:      { borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, alignSelf: 'flex-start', marginTop: 4 },
+  todayCard:     { borderRadius: 22, marginBottom: 26, elevation: 0 },
+  todayGrad:     { padding: 22 },
+  todayBadge:    { alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5, marginBottom: 14 },
+  todayBadgeText:{ color: '#fff', fontSize: 12, fontWeight: '700' },
+  todayQ:        { color: '#fff', fontSize: 17, fontWeight: '700', lineHeight: 26, marginBottom: 18 },
+  todayFooter:   {},
+  todayAction:   { color: 'rgba(255,255,255,0.9)', fontSize: 14, fontWeight: '800' },
+  glassCard:     { borderRadius: 20, padding: 14 },
+  histRow:       { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
+  histIcon:      { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', elevation: 0 },
+  histTitle:     { fontSize: 14, fontWeight: '700' },
+  histDate:      { fontSize: 12, marginTop: 2 },
+  statusBadge:   { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+  statusText:    { fontSize: 11, fontWeight: '700' },
 });

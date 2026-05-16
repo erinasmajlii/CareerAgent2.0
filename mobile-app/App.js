@@ -1,131 +1,71 @@
-import React, { useEffect } from 'react';
-import { StatusBar, View, Text, TouchableOpacity, Platform, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, ActivityIndicator, StyleSheet, StatusBar } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { AuthProvider, useAuth }         from './src/context/AuthContext';
+import { ThemeProvider, useTheme }       from './src/context/ThemeContext';
+import { DrawerProvider, useDrawer }     from './src/context/DrawerContext';
 
-import OnboardingScreen from './src/screens/OnboardingScreen';
-import LoginScreen from './src/screens/LoginScreen';
-import HomeScreen from './src/screens/HomeScreen';
-import AnalyzeScreen from './src/screens/AnalyzeScreen';
-import GenerateScreen from './src/screens/GenerateScreen';
-import PrepScreen from './src/screens/PrepScreen';
-import QuestionScreen from './src/screens/QuestionScreen';
-import ProfileScreen from './src/screens/ProfileScreen';
-import SettingsScreen from './src/screens/SettingsScreen';
+import SideDrawer    from './src/components/SideDrawer';
+import GlassTabBar   from './src/components/GlassTabBar';
 
-import { C, GRAD } from './src/theme';
+import OnboardingScreen  from './src/screens/OnboardingScreen';
+import LoginScreen       from './src/screens/LoginScreen';
+import HomeScreen        from './src/screens/HomeScreen';
+import AnalyzeScreen     from './src/screens/AnalyzeScreen';
+import GenerateScreen    from './src/screens/GenerateScreen';
+import PrepScreen        from './src/screens/PrepScreen';
+import QuestionScreen    from './src/screens/QuestionScreen';
+import ProfileScreen     from './src/screens/ProfileScreen';
+import EditProfileScreen from './src/screens/EditProfileScreen';
+import ChatBotScreen     from './src/screens/ChatBotScreen';
+import SettingsScreen    from './src/screens/SettingsScreen';
 
 const Stack = createNativeStackNavigator();
-const Tab = createBottomTabNavigator();
-const PrepStack = createNativeStackNavigator();
-const ProfileStack = createNativeStackNavigator();
+const Tab   = createBottomTabNavigator();
+const ONBOARDING_KEY = '@careeragent_onboarding';
 
-const TABS = [
-  { name: 'Home', icon: '⌂', label: 'Home' },
-  { name: 'Analyze', icon: '🔍', label: 'Analyze' },
-  { name: 'Generate', icon: '✦', label: 'Generate' },
-  { name: 'Prep', icon: '📚', label: 'Prep' },
-  { name: 'Profile', icon: '◉', label: 'Profile' },
-];
-
-function CustomTabBar({ state, descriptors, navigation }) {
-  return (
-    <View style={tabStyles.container}>
-      {state.routes.map((route, index) => {
-        const focused = state.index === index;
-        const tab = TABS.find(t => t.name === route.name) || {};
-        return (
-          <TouchableOpacity
-            key={route.key}
-            onPress={() => navigation.navigate(route.name)}
-            activeOpacity={0.7}
-            style={tabStyles.tab}
-          >
-            {focused && <View style={tabStyles.activePill} />}
-            <Text style={[tabStyles.icon, focused && tabStyles.iconActive]}>
-              {tab.icon}
-            </Text>
-            <Text style={[tabStyles.label, focused && tabStyles.labelActive]}>
-              {tab.label}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
-}
-
-const tabStyles = {
-  container: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    paddingBottom: Platform.OS === 'ios' ? 24 : 10,
-    paddingTop: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 10,
-  },
-  tab: { flex: 1, alignItems: 'center', gap: 3, position: 'relative' },
-  activePill: {
-    position: 'absolute', top: -10, width: 32, height: 3,
-    backgroundColor: C.primary, borderBottomLeftRadius: 3, borderBottomRightRadius: 3,
-  },
-  icon: { fontSize: 20, color: '#9CA3AF' },
-  iconActive: { color: C.primary },
-  label: { fontSize: 10, color: '#9CA3AF', fontWeight: '500' },
-  labelActive: { color: C.primary, fontWeight: '700' },
-};
-
-function PrepNavigator() {
-  return (
-    <PrepStack.Navigator screenOptions={{ headerShown: false }}>
-      <PrepStack.Screen name="PrepHome" component={PrepScreen} />
-      <PrepStack.Screen name="Question" component={QuestionScreen} />
-    </PrepStack.Navigator>
-  );
-}
-
-function ProfileNavigator() {
-  return (
-    <ProfileStack.Navigator screenOptions={{ headerShown: false }}>
-      <ProfileStack.Screen name="ProfileHome" component={ProfileScreen} />
-      <ProfileStack.Screen name="Settings" component={SettingsScreen} />
-    </ProfileStack.Navigator>
-  );
-}
-
+// ── 3-Tab Navigator ─────────────────────────────────────────────────────────
 function MainTabs() {
   return (
     <Tab.Navigator
-      tabBar={props => <CustomTabBar {...props} />}
-      screenOptions={{
-        headerStyle: { backgroundColor: C.bg, shadowColor: 'transparent', elevation: 0 },
-        headerTitleStyle: { fontWeight: '800', fontSize: 18, color: C.text },
-        headerTintColor: C.text,
-      }}
+      tabBar={(props) => <GlassTabBar {...props} />}
+      screenOptions={{ headerShown: false }}
     >
-      <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Dashboard' }} />
-      <Tab.Screen name="Analyze" component={AnalyzeScreen} options={{ headerShown: false }} />
-      <Tab.Screen name="Generate" component={GenerateScreen} options={{ headerShown: false }} />
-      <Tab.Screen name="Prep" component={PrepNavigator} options={{ headerShown: false }} />
-      <Tab.Screen name="Profile" component={ProfileNavigator} options={{ headerShown: false }} />
+      <Tab.Screen name="Home"     component={HomeScreen}     />
+      <Tab.Screen name="Analyze"  component={AnalyzeScreen}  />
+      <Tab.Screen name="Generate" component={GenerateScreen} />
     </Tab.Navigator>
   );
 }
 
-// Root navigator that responds to auth state
+// ── Main Layout ───────────────────────────────────────────────────────────────
+function MainLayout() {
+  return (
+    <DrawerProvider>
+      <View style={{ flex: 1 }}>
+        <MainTabs />
+        <SideDrawer />
+      </View>
+    </DrawerProvider>
+  );
+}
+
+// ── Root Navigator ─────────────────────────────────────────────────────────────
 function RootNavigator() {
   const { session, loading } = useAuth();
+  const { colors: C, ready } = useTheme();
+  const [seenOnboarding, setSeen] = useState(null);
 
-  if (loading) {
+  useEffect(() => {
+    AsyncStorage.getItem(ONBOARDING_KEY).then((v) => setSeen(v === 'true'));
+  }, []);
+
+  if (loading || seenOnboarding === null || !ready) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.bg }}>
         <ActivityIndicator size="large" color={C.primary} />
@@ -134,14 +74,33 @@ function RootNavigator() {
   }
 
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator screenOptions={{ headerShown: false, animation: 'fade' }}>
       {session ? (
-        // Authenticated — go straight to app
-        <Stack.Screen name="Main" component={MainTabs} />
-      ) : (
-        // Not authenticated — show onboarding / login
         <>
-          <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+          <Stack.Screen name="Main"        component={MainLayout}       />
+          <Stack.Screen name="Profile"     component={ProfileScreen}     options={{ animation: 'slide_from_right' }} />
+          <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ animation: 'slide_from_bottom' }} />
+          <Stack.Screen name="Prep"        component={PrepScreen}        options={{ animation: 'slide_from_right' }} />
+          <Stack.Screen name="Question"    component={QuestionScreen}    options={{ animation: 'slide_from_right' }} />
+          <Stack.Screen name="ChatBot"     component={ChatBotScreen}     options={{ animation: 'slide_from_right' }} />
+          <Stack.Screen name="Settings"    component={SettingsScreen}    options={{ animation: 'slide_from_right' }} />
+        </>
+      ) : (
+        <>
+          {!seenOnboarding && (
+            <Stack.Screen name="Onboarding">
+              {(props) => (
+                <OnboardingScreen
+                  {...props}
+                  onDone={async () => {
+                    await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
+                    setSeen(true);
+                    props.navigation.replace('Login');
+                  }}
+                />
+              )}
+            </Stack.Screen>
+          )}
           <Stack.Screen name="Login" component={LoginScreen} />
         </>
       )}
@@ -149,15 +108,28 @@ function RootNavigator() {
   );
 }
 
+function AppShell() {
+  const { isDark, colors } = useTheme();
+  return (
+    <>
+      <StatusBar hidden />
+      <NavigationContainer>
+        <RootNavigator />
+      </NavigationContainer>
+    </>
+  );
+}
+
 export default function App() {
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
-        <NavigationContainer>
-          <RootNavigator />
-        </NavigationContainer>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <AppShell />
+        </AuthProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
+
+const styles = StyleSheet.create({});

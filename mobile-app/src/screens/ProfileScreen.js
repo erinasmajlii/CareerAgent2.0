@@ -3,156 +3,150 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { C, GRAD, shadow, shadowSm } from '../theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { fetchAnalyses, fetchApplications, fetchPrepSessions } from '../api';
 
+const MENU = [
+  { icon: '📄', label: 'Saved Analyses',    sub: 'Your gap analysis history',  color: '#8B7FFF' },
+  { icon: '📋', label: 'Applications',       sub: 'Track your job pipeline',    color: '#10B981' },
+  { icon: '🔔', label: 'Notifications',      sub: 'Alerts & reminders',         color: '#F59E0B' },
+  { icon: '🔒', label: 'Privacy & Security', sub: 'Account protection',         color: '#EF4444' },
+];
+
 export default function ProfileScreen({ navigation }) {
+  const { colors: C, gradient: GRAD, isDark, neonShadow, shadowSm } = useTheme();
+  const insets = useSafeAreaInsets();
   const { profile, user, signOut } = useAuth();
-  const [stats, setStats] = useState({ resumes: 0, applications: 0, sessions: 0 });
+  const [stats, setStats]   = useState({ analyses: 0, apps: 0, sessions: 0 });
   const [loading, setLoading] = useState(true);
 
-  const loadStats = useCallback(async () => {
+  const load = useCallback(async () => {
     setLoading(true);
-    const [analyses, apps, sessions] = await Promise.all([
-      fetchAnalyses(100),
-      fetchApplications(100),
-      fetchPrepSessions(100),
-    ]);
-    setStats({
-      resumes: analyses.length,
-      applications: apps.length,
-      sessions: sessions.length,
-    });
+    const [a, b, c] = await Promise.all([fetchAnalyses(100), fetchApplications(100), fetchPrepSessions(100)]);
+    setStats({ analyses: a.length, apps: b.length, sessions: c.length });
     setLoading(false);
   }, []);
 
-  useEffect(() => { loadStats(); }, [loadStats]);
+  useEffect(() => { load(); }, [load]);
 
   const displayName = profile?.full_name || user?.email?.split('@')[0] || 'User';
-  const initials = displayName.charAt(0).toUpperCase();
-  const email = user?.email || '';
+  const targetTitle = profile?.target_title || 'Career Professional';
+  const initial     = displayName.charAt(0).toUpperCase();
 
-  const STATS = [
-    { value: String(stats.resumes), label: 'Saved\nAnalyses' },
-    { value: String(stats.applications), label: 'Applications\nTracked' },
-    { value: String(stats.sessions), label: 'Practice\nSessions' },
+  const glassCard = [
+    styles.card,
+    isDark
+      ? { backgroundColor: 'rgba(139,127,255,0.06)', borderColor: 'rgba(139,127,255,0.22)', borderWidth: 1 }
+      : { backgroundColor: '#fff', ...shadowSm },
   ];
-
-  const MY_CONTENT = [
-    { icon: '📄', label: 'Saved Analyses', count: `${stats.resumes} analyses` },
-    { icon: '📋', label: 'Applications', count: `${stats.applications} tracking` },
-  ];
-
-  const handleSignOut = async () => {
-    try { await signOut(); } catch (e) { console.warn('Sign out error:', e.message); }
-  };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      {/* Header Card */}
-      <LinearGradient colors={GRAD} style={styles.headerCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{initials}</Text>
+    <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ paddingBottom: 110 }} showsVerticalScrollIndicator={false}>
+
+      {/* ── Profile Header ── */}
+      <LinearGradient colors={isDark ? ['#13121F', '#0A0A1A'] : GRAD} style={[styles.headerGrad, { paddingTop: insets.top + 68 }]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+        {/* Avatar with neon glow ring */}
+        <View style={[
+          styles.avatarRing,
+          {
+            borderColor: isDark ? '#8B7FFF' : 'rgba(255,255,255,0.7)',
+            shadowColor: '#8B7FFF', shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: isDark ? 0.9 : 0.4, shadowRadius: 20,
+          },
+        ]}>
+          <LinearGradient colors={GRAD} style={styles.avatarInner} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+            <Text style={styles.avatarText}>{initial}</Text>
+          </LinearGradient>
         </View>
-        <Text style={styles.userName}>{displayName}</Text>
-        <Text style={styles.userEmail}>{email}</Text>
-        <TouchableOpacity style={styles.editBtn}>
-          <Text style={styles.editText}>Edit Profile</Text>
+        <Text style={[styles.userName, { color: isDark ? C.text : '#fff' }]}>{displayName}</Text>
+        <Text style={[styles.userTitle, { color: isDark ? C.subtext : 'rgba(255,255,255,0.75)' }]}>{targetTitle}</Text>
+        <TouchableOpacity
+          onPress={() => navigation.navigate('EditProfile')}
+          style={[styles.editBtn, { backgroundColor: isDark ? 'rgba(139,127,255,0.2)' : 'rgba(255,255,255,0.25)', borderColor: isDark ? 'rgba(139,127,255,0.5)' : 'rgba(255,255,255,0.5)', borderWidth: 1 }]}
+        >
+          <Text style={{ color: isDark ? C.primary : '#fff', fontWeight: '700', fontSize: 14 }}>✏️  Edit Profile</Text>
         </TouchableOpacity>
       </LinearGradient>
 
-      {/* Stats Row */}
-      <View style={styles.statsCard}>
+      {/* ── Stats Card ── */}
+      <View style={[styles.statsCard, isDark ? { backgroundColor: '#13121F', borderColor: 'rgba(139,127,255,0.25)', borderWidth: 1, shadowColor: '#8B7FFF', shadowOpacity: 0.2, shadowRadius: 16, shadowOffset: { width: 0, height: 0 } } : { backgroundColor: '#fff', ...shadowSm }]}>
         {loading ? (
-          <ActivityIndicator color={C.primary} style={{ padding: 20, flex: 1 }} />
+          <ActivityIndicator color={C.primary} style={{ flex: 1, paddingVertical: 16 }} />
         ) : (
-          STATS.map((s, i) => (
+          [
+            { label: 'Analyses',     value: stats.analyses, color: '#8B7FFF' },
+            { label: 'Applications', value: stats.apps,     color: '#10B981' },
+            { label: 'Sessions',     value: stats.sessions, color: '#F59E0B' },
+          ].map((s, i, arr) => (
             <React.Fragment key={i}>
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>{s.value}</Text>
-                <Text style={styles.statLabel}>{s.label}</Text>
+                <Text style={[styles.statValue, { color: s.color }]}>{s.value}</Text>
+                <Text style={[styles.statLabel, { color: C.subtext }]}>{s.label}</Text>
               </View>
-              {i < STATS.length - 1 && <View style={styles.statDivider} />}
+              {i < arr.length - 1 && <View style={[styles.statDivider, { backgroundColor: C.border }]} />}
             </React.Fragment>
           ))
         )}
       </View>
 
-      {/* My Content */}
-      <Text style={styles.sectionTitle}>My Content</Text>
-      <View style={styles.card}>
-        {MY_CONTENT.map((item, i) => (
-          <TouchableOpacity key={i} style={[styles.menuRow, i < MY_CONTENT.length - 1 && styles.rowBorder]}>
-            <View style={styles.menuIcon}>
+      {/* ── Menu Items ── */}
+      <View style={{ paddingHorizontal: 18, gap: 10, marginTop: 8 }}>
+        {MENU.map((item, i) => (
+          <TouchableOpacity key={i} style={glassCard} activeOpacity={0.75}>
+            <View style={[styles.menuIcon, { backgroundColor: item.color + '22', shadowColor: item.color, shadowOpacity: isDark ? 0.5 : 0, shadowRadius: 8, shadowOffset: { width: 0, height: 0 } }]}>
               <Text style={{ fontSize: 20 }}>{item.icon}</Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.menuLabel}>{item.label}</Text>
-              <Text style={styles.menuCount}>{item.count}</Text>
+              <Text style={[styles.menuLabel, { color: C.text }]}>{item.label}</Text>
+              <Text style={[styles.menuSub, { color: C.subtext }]}>{item.sub}</Text>
             </View>
-            <Text style={styles.chevron}>›</Text>
+            <Text style={[styles.chevron, { color: C.subtext }]}>›</Text>
           </TouchableOpacity>
         ))}
       </View>
 
-      {/* Account Settings */}
-      <Text style={styles.sectionTitle}>Account Settings</Text>
-      <View style={styles.card}>
-        <TouchableOpacity style={[styles.menuRow, styles.rowBorder]} onPress={() => navigation.navigate('Settings')}>
-          <View style={[styles.menuIcon, { backgroundColor: '#EEF0FF' }]}>
-            <Text style={{ fontSize: 20 }}>⚙️</Text>
-          </View>
-          <Text style={[styles.menuLabel, { flex: 1 }]}>App Settings</Text>
-          <Text style={styles.chevron}>›</Text>
+      {/* ── Settings & Sign Out ── */}
+      <View style={{ paddingHorizontal: 18, marginTop: 16, gap: 10 }}>
+        <TouchableOpacity style={glassCard} onPress={() => navigation.navigate('Settings')} activeOpacity={0.75}>
+          <View style={[styles.menuIcon, { backgroundColor: 'rgba(139,127,255,0.15)' }]}><Text style={{ fontSize: 20 }}>⚙️</Text></View>
+          <Text style={[styles.menuLabel, { flex: 1, color: C.text }]}>Settings</Text>
+          <Text style={[styles.chevron, { color: C.subtext }]}>›</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.menuRow}>
-          <View style={[styles.menuIcon, { backgroundColor: '#FEE2E2' }]}>
-            <Text style={{ fontSize: 20 }}>🔒</Text>
-          </View>
-          <Text style={[styles.menuLabel, { flex: 1 }]}>Privacy & Security</Text>
-          <Text style={styles.chevron}>›</Text>
+
+        <TouchableOpacity
+          style={[glassCard, { borderColor: isDark ? 'rgba(239,68,68,0.3)' : '#FEE2E2', backgroundColor: isDark ? 'rgba(239,68,68,0.06)' : '#FFF5F5' }]}
+          onPress={() => signOut().catch(() => {})}
+          activeOpacity={0.75}
+        >
+          <View style={[styles.menuIcon, { backgroundColor: 'rgba(239,68,68,0.15)' }]}><Text style={{ fontSize: 20 }}>🚪</Text></View>
+          <Text style={[styles.menuLabel, { flex: 1, color: C.danger }]}>Sign Out</Text>
         </TouchableOpacity>
       </View>
-
-      {/* Logout */}
-      <TouchableOpacity style={styles.logoutBtn} onPress={handleSignOut}>
-        <Text style={styles.logoutText}>Log Out</Text>
-      </TouchableOpacity>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: C.bg },
-  content: { paddingBottom: 40 },
-  headerCard: { alignItems: 'center', padding: 32, paddingTop: 40 },
-  avatar: {
-    width: 80, height: 80, borderRadius: 40,
-    backgroundColor: 'rgba(255,255,255,0.3)', alignItems: 'center', justifyContent: 'center', marginBottom: 12,
-    borderWidth: 3, borderColor: '#fff',
-  },
-  avatarText: { color: '#fff', fontSize: 36, fontWeight: '900' },
-  userName: { color: '#fff', fontSize: 22, fontWeight: '800', marginBottom: 4 },
-  userEmail: { color: 'rgba(255,255,255,0.8)', fontSize: 14, marginBottom: 16 },
-  editBtn: { backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, paddingHorizontal: 24, paddingVertical: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)' },
-  editText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  headerGrad:   { alignItems: 'center', paddingBottom: 36, paddingHorizontal: 24 },
+  avatarRing:   { width: 100, height: 100, borderRadius: 50, borderWidth: 3, padding: 3, marginBottom: 14, elevation: 0 },
+  avatarInner:  { flex: 1, borderRadius: 47, alignItems: 'center', justifyContent: 'center' },
+  avatarText:   { color: '#fff', fontSize: 40, fontWeight: '900' },
+  userName:     { fontSize: 22, fontWeight: '800', marginBottom: 4 },
+  userTitle:    { fontSize: 14, marginBottom: 18 },
+  editBtn:      { borderRadius: 24, paddingHorizontal: 24, paddingVertical: 10 },
   statsCard: {
-    flexDirection: 'row', backgroundColor: C.surface, marginHorizontal: 16, borderRadius: 18,
-    paddingVertical: 20, marginTop: -20, ...shadow, marginBottom: 24,
+    flexDirection: 'row', marginHorizontal: 18, borderRadius: 20,
+    paddingVertical: 20, marginTop: -20, marginBottom: 20,
   },
-  statItem: { flex: 1, alignItems: 'center' },
-  statValue: { color: C.primary, fontSize: 24, fontWeight: '900' },
-  statLabel: { color: C.subtext, fontSize: 11, textAlign: 'center', marginTop: 4, lineHeight: 16 },
-  statDivider: { width: 1, backgroundColor: C.border, marginVertical: 8 },
-  sectionTitle: { fontSize: 17, fontWeight: '700', color: C.text, marginBottom: 10, paddingHorizontal: 16 },
-  card: { backgroundColor: C.surface, borderRadius: 16, marginHorizontal: 16, marginBottom: 20, overflow: 'hidden', ...shadowSm, shadowColor: '#000' },
-  menuRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
-  rowBorder: { borderBottomWidth: 1, borderBottomColor: C.border },
-  menuIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: C.primaryLight, alignItems: 'center', justifyContent: 'center' },
-  menuLabel: { color: C.text, fontSize: 15, fontWeight: '600' },
-  menuCount: { color: C.subtext, fontSize: 12, marginTop: 2 },
-  chevron: { color: C.subtext, fontSize: 22, fontWeight: '300' },
-  logoutBtn: { marginHorizontal: 16, paddingVertical: 16, alignItems: 'center', backgroundColor: '#FEE2E2', borderRadius: 14 },
-  logoutText: { color: '#EF4444', fontSize: 16, fontWeight: '700' },
+  statItem:     { flex: 1, alignItems: 'center' },
+  statValue:    { fontSize: 26, fontWeight: '900' },
+  statLabel:    { fontSize: 11, marginTop: 4 },
+  statDivider:  { width: 1, marginVertical: 6 },
+  card:         { flexDirection: 'row', alignItems: 'center', borderRadius: 18, padding: 14, gap: 14 },
+  menuIcon:     { width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center', elevation: 0 },
+  menuLabel:    { fontSize: 15, fontWeight: '700' },
+  menuSub:      { fontSize: 12, marginTop: 2 },
+  chevron:      { fontSize: 22 },
 });

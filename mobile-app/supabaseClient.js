@@ -1,6 +1,11 @@
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseUrl = 'https://nhemygfseqjjspjyzbpw.supabase.co'
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5oZW15Z2ZzZXFqanNwanl6YnB3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4NTcwNTIsImV4cCI6MjA5NDQzMzA1Mn0.BT4RDcbAArsM0GLqWKPakM61vjNGiTq6wpozfze2GKM'
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+/**
+ * supabaseClient.js (root-level)
+ *
+ * ⚠️  DEPRECATED — this file is a legacy stub kept to avoid breaking
+ * any stale imports. The canonical Supabase client is in:
+ *   src/supabase.js   ← use this everywhere
+ *
+ * All credentials are read from .env via EXPO_PUBLIC_* env vars.
+ * Never hardcode API keys or tokens in source files.
+ */
+export { supabase } from './src/supabase';

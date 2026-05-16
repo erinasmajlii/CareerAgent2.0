@@ -1,221 +1,175 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, KeyboardAvoidingView, Platform, ActivityIndicator,
+  TextInput, Switch, ActivityIndicator, Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
-import { C, GRAD, shadow, shadowSm } from '../theme';
-
-const IMPROVEMENTS = [
-  'Add measurable results, e.g. "Improved ATS score by 30%"',
-  'Quantified achievements match 80% of job requirements',
-  'Add more quantifiable results for leadership section',
-  'Formatting optimized for ATS parsing',
-];
-
-const RECENT = [
-  { name: 'Senior_Developer_Resume.pdf', pct: 92, time: '2h ago', color: '#10B981' },
-  { name: 'Staff_Engineer_Resume.pdf', pct: 88, time: '1d ago', color: '#10B981' },
-  { name: 'Lead_Dev_Resume.pdf', pct: 76, time: '3d ago', color: '#F59E0B' },
-];
+import { useTheme } from '../context/ThemeContext';
+import { analyzeGap } from '../api';
 
 export default function GenerateScreen() {
-  const [resumeFile, setResumeFile] = useState(null);
-  const [jobUrl, setJobUrl] = useState('');
-  const [chatOpen, setChatOpen] = useState(false);
-  const [messages, setMessages] = useState([
-    { id: 0, text: "Hi! I've generated your optimized resume with 92% ATS match. You can ask me to add, remove, or modify any section.", sender: 'ai' },
-  ]);
-  const [input, setInput] = useState('');
-  const [aiLoading, setAiLoading] = useState(false);
+  const { colors: C, gradient: GRAD, shadowSm, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
+  const [mode, setMode]         = useState('text');   // 'linkedin' | 'text'
+  const [linkedinUrl, setUrl]   = useState('');
+  const [rawText, setRaw]       = useState('');
+  const [resumeFile, setFile]   = useState(null);
+  const [loading, setLoading]   = useState(false);
+  const [result, setResult]     = useState(null);
 
   const pickDoc = async () => {
     const res = await DocumentPicker.getDocumentAsync({ type: 'application/pdf' });
-    if (!res.canceled && res.assets?.length > 0) setResumeFile(res.assets[0]);
+    if (!res.canceled && res.assets?.length) setFile(res.assets[0]);
   };
 
-  const sendMessage = async () => {
-    if (!input.trim()) return;
-    const userMsg = { id: Date.now(), text: input, sender: 'user' };
-    setMessages(prev => [...prev, userMsg]);
-    setInput('');
-    setAiLoading(true);
-    setTimeout(() => {
-      setMessages(prev => [...prev, { id: Date.now() + 1, text: 'I\'ve updated your resume based on that feedback. The ATS score remains strong at 91%.', sender: 'ai' }]);
-      setAiLoading(false);
-    }, 1200);
+  const handleOptimize = async () => {
+    const jd = mode === 'linkedin' ? `LinkedIn URL: ${linkedinUrl}` : rawText;
+    if (!jd.trim()) { Alert.alert('Missing Input', 'Please provide a job description or LinkedIn URL.'); return; }
+    setLoading(true);
+    try {
+      const data = await analyzeGap(resumeFile?.uri, jd);
+      setResult(data);
+    } catch { Alert.alert('Error', 'Optimization failed. Check your connection.'); }
+    finally { setLoading(false); }
   };
 
-  return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={styles.pageTitle}>Resume Generator</Text>
-        <Text style={styles.pageSubtitle}>Upload resume and analyze job listings</Text>
+  const S = getStyles(C);
 
-        {/* Upload */}
-        <TouchableOpacity onPress={pickDoc} style={[styles.uploadCard, resumeFile && styles.uploadActive]}>
-          <Text style={styles.uploadIcon}>{resumeFile ? '✓' : '↑'}</Text>
-          <Text style={[styles.uploadLabel, resumeFile && { color: '#10B981' }]}>
-            {resumeFile ? resumeFile.name : 'Upload Your Resume'}
-          </Text>
-          <Text style={styles.uploadSub}>{resumeFile ? 'PDF uploaded' : 'PDF, DOCX up to 10MB'}</Text>
-        </TouchableOpacity>
+  const cardStyle = [
+    S.card,
+    { backgroundColor: C.surface },
+    isDark ? { borderWidth: 1, borderColor: 'rgba(139,127,255,0.2)' } : shadowSm,
+  ];
 
-        {/* ATS Score */}
-        <View style={styles.scoreCard}>
-          <View style={styles.scoreRow}>
-            <Text style={styles.scoreCardTitle}>ATS Match Score</Text>
-            <Text style={styles.scoreNumber}>92%</Text>
+  // ── Result view ──────────────────────────────────────────────────────────
+  if (result) {
+    return (
+      <ScrollView style={[S.container, { backgroundColor: C.bg }]} contentContainerStyle={[S.content, { paddingTop: insets.top + 68 }]}>
+        <Text style={[S.pageTitle, { color: C.text }]}>Optimization Result</Text>
+        <LinearGradient colors={GRAD} style={S.scoreCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+          <Text style={S.scoreLabel}>ATS Match</Text>
+          <Text style={S.scoreValue}>{result.match_score}%</Text>
+        </LinearGradient>
+        {result.cheat_sheet?.map((item, i) => (
+          <View key={i} style={[...cardStyle, { flexDirection: 'row', gap: 12, marginBottom: 10 }]}>
+            <View style={[S.bullet, { backgroundColor: C.primary }]}><Text style={{ color: '#fff', fontWeight: '800' }}>{i + 1}</Text></View>
+            <Text style={[{ flex: 1, fontSize: 14, lineHeight: 20, color: C.text }]}>{item}</Text>
           </View>
-          <View style={styles.scoreBarBg}>
-            <LinearGradient colors={['#10B981', '#34D399']} style={[styles.scoreBarFill, { width: '92%' }]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} />
-          </View>
-          <Text style={styles.scoreHint}>Job Posting: 85% match</Text>
-        </View>
-
-        {/* Job URL */}
-        <Text style={styles.inputLabel}>Job Posting URL</Text>
-        <TextInput
-          style={styles.urlInput}
-          placeholder="https://jobs.company.com/..."
-          placeholderTextColor={C.border}
-          value={jobUrl}
-          onChangeText={setJobUrl}
-          autoCapitalize="none"
-        />
-
-        {/* Download */}
-        <TouchableOpacity activeOpacity={0.85}>
-          <LinearGradient colors={['#10B981', '#059669']} style={styles.downloadBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-            <Text style={styles.downloadText}>⬇  Download PDF</Text>
+        ))}
+        <TouchableOpacity onPress={() => setResult(null)} activeOpacity={0.85}>
+          <LinearGradient colors={GRAD} style={S.mainBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+            <Text style={S.mainBtnText}>✦  Optimize Again</Text>
           </LinearGradient>
         </TouchableOpacity>
-
-        {/* Key Improvements */}
-        <Text style={styles.sectionTitle}>Key Improvements</Text>
-        <View style={styles.card}>
-          {IMPROVEMENTS.map((item, i) => (
-            <View key={i} style={[styles.impRow, i < IMPROVEMENTS.length - 1 && styles.rowBorder]}>
-              <Text style={styles.impDot}>•</Text>
-              <Text style={styles.impText}>{item}</Text>
-            </View>
-          ))}
-        </View>
-
-        {/* Recent Analyses */}
-        <View style={styles.sectionRow}>
-          <Text style={styles.sectionTitle}>Recent Analyses</Text>
-          <TouchableOpacity><Text style={styles.seeAll}>See all</Text></TouchableOpacity>
-        </View>
-        <View style={styles.card}>
-          {RECENT.map((r, i) => (
-            <View key={i} style={[styles.recentRow, i < RECENT.length - 1 && styles.rowBorder]}>
-              <View style={styles.recentIcon}><Text>📄</Text></View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.recentName}>{r.name}</Text>
-                <Text style={styles.recentTime}>{r.time}</Text>
-              </View>
-              <View style={[styles.pctBadge, { backgroundColor: r.color + '22' }]}>
-                <Text style={[styles.pctText, { color: r.color }]}>{r.pct}%</Text>
-              </View>
-            </View>
-          ))}
-        </View>
-
-        {/* AI Assistant Toggle */}
-        <TouchableOpacity onPress={() => setChatOpen(!chatOpen)} activeOpacity={0.85}>
-          <LinearGradient colors={GRAD} style={styles.aiBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-            <Text style={styles.aiBtnText}>{chatOpen ? '✕ Close' : '✦ AI Assistant'}</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-
-        {/* AI Chat Panel */}
-        {chatOpen && (
-          <View style={styles.chatPanel}>
-            <ScrollView style={styles.chatMessages} contentContainerStyle={{ padding: 12 }}>
-              {messages.map(m => (
-                <View key={m.id} style={[styles.bubble, m.sender === 'user' ? styles.userBubble : styles.aiBubble]}>
-                  <Text style={[styles.bubbleText, m.sender === 'user' ? styles.userText : styles.aiText]}>{m.text}</Text>
-                </View>
-              ))}
-              {aiLoading && <ActivityIndicator color={C.primary} style={{ alignSelf: 'flex-start', margin: 8 }} />}
-            </ScrollView>
-            <View style={styles.chatInput}>
-              <TextInput
-                style={styles.chatTextInput}
-                placeholder="Ask AI to edit your resume..."
-                placeholderTextColor={C.border}
-                value={input}
-                onChangeText={setInput}
-              />
-              <TouchableOpacity onPress={sendMessage} style={styles.sendBtn}>
-                <LinearGradient colors={GRAD} style={styles.sendGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-                  <Text style={{ color: '#fff', fontWeight: '700' }}>→</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
       </ScrollView>
-    </KeyboardAvoidingView>
+    );
+  }
+
+  // ── Input view ───────────────────────────────────────────────────────────
+  return (
+    <ScrollView
+      style={[S.container, { backgroundColor: C.bg }]}
+      contentContainerStyle={[S.content, { paddingTop: insets.top + 68 }]}
+      keyboardShouldPersistTaps="handled"
+    >
+      <Text style={[S.pageTitle, { color: C.text }]}>Resume Optimizer</Text>
+      <Text style={[S.pageSubtitle, { color: C.subtext }]}>AI-powered ATS optimization for your next role</Text>
+
+      {/* Upload */}
+      <TouchableOpacity
+        onPress={pickDoc}
+        style={[
+          S.uploadCard,
+          { backgroundColor: C.surface, borderColor: resumeFile ? '#10B981' : C.border },
+          isDark && !resumeFile ? { borderColor: 'rgba(139,127,255,0.3)' } : null,
+        ]}
+      >
+        <Text style={S.uploadIcon}>{resumeFile ? '✓' : '↑'}</Text>
+        <Text style={[S.uploadLabel, { color: resumeFile ? '#10B981' : C.text }]}>
+          {resumeFile ? resumeFile.name : 'Upload Resume (PDF)'}
+        </Text>
+        <Text style={[S.uploadSub, { color: C.subtext }]}>{resumeFile ? 'Tap to change' : 'optional — improves results'}</Text>
+      </TouchableOpacity>
+
+      {/* Mode Toggle */}
+      <View style={[S.toggleRow, { backgroundColor: isDark ? 'rgba(139,127,255,0.1)' : C.primaryLight, borderColor: C.border }]}>
+        {['linkedin', 'text'].map((m) => (
+          <TouchableOpacity
+            key={m}
+            onPress={() => setMode(m)}
+            activeOpacity={0.8}
+            style={[S.toggleBtn, mode === m && { backgroundColor: C.primary }]}
+          >
+            <Text style={[S.toggleText, { color: mode === m ? '#fff' : C.subtext }]}>
+              {m === 'linkedin' ? '🔗 LinkedIn URL' : '📄 Paste Text'}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Input Area */}
+      {mode === 'linkedin' ? (
+        <TextInput
+          style={[S.input, { backgroundColor: C.inputBg, borderColor: C.border, color: C.text }]}
+          placeholder="https://linkedin.com/jobs/view/..."
+          placeholderTextColor={C.border}
+          value={linkedinUrl} onChangeText={setUrl}
+          autoCapitalize="none" keyboardType="url"
+        />
+      ) : (
+        <TextInput
+          style={[S.textarea, { backgroundColor: C.inputBg, borderColor: C.border, color: C.text }]}
+          placeholder="Paste the full job description here for best results..."
+          placeholderTextColor={C.border}
+          value={rawText} onChangeText={setRaw}
+          multiline textAlignVertical="top"
+        />
+      )}
+
+      <TouchableOpacity onPress={handleOptimize} disabled={loading} activeOpacity={0.85}>
+        <LinearGradient
+          colors={loading ? ['#C4C4C4', '#C4C4C4'] : GRAD}
+          style={S.mainBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+        >
+          {loading
+            ? <ActivityIndicator color="#fff" />
+            : <Text style={S.mainBtnText}>✦  Optimize Resume</Text>}
+        </LinearGradient>
+      </TouchableOpacity>
+    </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: C.bg },
-  content: { padding: 16, paddingBottom: 40 },
-  pageTitle: { fontSize: 24, fontWeight: '800', color: C.text, marginBottom: 6 },
-  pageSubtitle: { fontSize: 14, color: C.subtext, marginBottom: 20 },
-  uploadCard: {
-    borderWidth: 2, borderColor: C.border, borderStyle: 'dashed',
-    borderRadius: 16, padding: 24, alignItems: 'center', marginBottom: 16, backgroundColor: C.surface,
+const getStyles = (C) => StyleSheet.create({
+  container:    { flex: 1 },
+  content:      { paddingHorizontal: 20, paddingBottom: 110 },
+  pageTitle:    { fontSize: 24, fontWeight: '800', marginBottom: 6, letterSpacing: -0.5 },
+  pageSubtitle: { fontSize: 14, marginBottom: 24, color: C.subtext },
+  card:         { borderRadius: 16, padding: 14 },
+  uploadCard:   { borderWidth: 2, borderStyle: 'dashed', borderRadius: 18, padding: 28, alignItems: 'center', marginBottom: 20 },
+  uploadIcon:   { fontSize: 30, marginBottom: 8 },
+  uploadLabel:  { fontSize: 15, fontWeight: '700' },
+  uploadSub:    { fontSize: 12, marginTop: 4 },
+  toggleRow:    { flexDirection: 'row', borderRadius: 14, padding: 4, marginBottom: 16, borderWidth: 1 },
+  toggleBtn:    { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 11 },
+  toggleText:   { fontSize: 13, fontWeight: '600' },
+  input: {
+    borderWidth: 1.5, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14,
+    fontSize: 14, marginBottom: 20,
   },
-  uploadActive: { borderColor: '#10B981', borderStyle: 'solid', backgroundColor: '#ECFDF5' },
-  uploadIcon: { fontSize: 32, marginBottom: 8 },
-  uploadLabel: { color: C.text, fontSize: 15, fontWeight: '700' },
-  uploadSub: { color: C.subtext, fontSize: 12, marginTop: 4 },
-  scoreCard: { backgroundColor: C.surface, borderRadius: 16, padding: 16, marginBottom: 16, ...shadowSm, shadowColor: '#000' },
-  scoreRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  scoreCardTitle: { color: C.text, fontSize: 15, fontWeight: '700' },
-  scoreNumber: { color: '#10B981', fontSize: 22, fontWeight: '900' },
-  scoreBarBg: { height: 8, backgroundColor: C.border, borderRadius: 4, overflow: 'hidden', marginBottom: 6 },
-  scoreBarFill: { height: '100%', borderRadius: 4 },
-  scoreHint: { color: C.subtext, fontSize: 12 },
-  inputLabel: { fontSize: 13, fontWeight: '600', color: C.text, marginBottom: 8 },
-  urlInput: {
-    backgroundColor: C.surface, borderWidth: 1.5, borderColor: C.border,
-    borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14,
-    fontSize: 14, color: C.text, marginBottom: 14,
+  textarea: {
+    borderWidth: 1.5, borderRadius: 16, padding: 16, minHeight: 130,
+    fontSize: 14, lineHeight: 22, marginBottom: 20,
   },
-  downloadBtn: { borderRadius: 14, paddingVertical: 15, alignItems: 'center', marginBottom: 24 },
-  downloadText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  sectionTitle: { fontSize: 17, fontWeight: '700', color: C.text, marginBottom: 10 },
-  seeAll: { color: C.primary, fontSize: 13, fontWeight: '600' },
-  card: { backgroundColor: C.surface, borderRadius: 16, overflow: 'hidden', marginBottom: 20, ...shadowSm, shadowColor: '#000' },
-  impRow: { flexDirection: 'row', padding: 14, gap: 10, alignItems: 'flex-start' },
-  rowBorder: { borderBottomWidth: 1, borderBottomColor: C.border },
-  impDot: { color: C.primary, fontSize: 18, lineHeight: 20 },
-  impText: { color: C.text, fontSize: 13, lineHeight: 19, flex: 1 },
-  recentRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
-  recentIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: C.primaryLight, alignItems: 'center', justifyContent: 'center' },
-  recentName: { color: C.text, fontSize: 13, fontWeight: '600' },
-  recentTime: { color: C.subtext, fontSize: 12, marginTop: 2 },
-  pctBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
-  pctText: { fontSize: 13, fontWeight: '700' },
-  aiBtn: { borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginBottom: 16 },
-  aiBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  chatPanel: { backgroundColor: C.surface, borderRadius: 16, overflow: 'hidden', ...shadowSm, shadowColor: '#000', marginBottom: 12 },
-  chatMessages: { maxHeight: 220 },
-  bubble: { maxWidth: '80%', borderRadius: 14, padding: 12, marginBottom: 8 },
-  userBubble: { alignSelf: 'flex-end', backgroundColor: C.primaryLight },
-  aiBubble: { alignSelf: 'flex-start', backgroundColor: '#F3F4F6' },
-  bubbleText: { fontSize: 13, lineHeight: 19 },
-  userText: { color: C.primary },
-  aiText: { color: C.text },
-  chatInput: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: C.border, padding: 10, gap: 8, alignItems: 'center' },
-  chatTextInput: { flex: 1, backgroundColor: C.bg, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, color: C.text },
-  sendBtn: { width: 40, height: 40 },
-  sendGrad: { flex: 1, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  mainBtn: {
+    borderRadius: 16, paddingVertical: 16, alignItems: 'center', marginBottom: 24,
+    shadowColor: '#6C63FF', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 10, elevation: 5,
+  },
+  mainBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  scoreCard:   { borderRadius: 22, padding: 30, alignItems: 'center', marginBottom: 20 },
+  scoreLabel:  { color: 'rgba(255,255,255,0.8)', fontSize: 13, marginBottom: 6 },
+  scoreValue:  { color: '#fff', fontSize: 60, fontWeight: '900', letterSpacing: -2 },
+  bullet:      { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
 });

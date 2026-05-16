@@ -1,190 +1,218 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, ActivityIndicator, Keyboard, TouchableWithoutFeedback,
+  TextInput, ActivityIndicator, Keyboard,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
-import { C, GRAD, shadow, shadowSm } from '../theme';
+import { useTheme } from '../context/ThemeContext';
 import { analyzeGap, fetchAnalyses } from '../api';
 
-function timeAgo(dateStr) {
-  if (!dateStr) return '';
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return days < 7 ? `${days}d ago` : `${Math.floor(days / 7)}w ago`;
+// Sample placeholder cards for an empty state
+const SAMPLE_ANALYSES = [
+  { id: 's1', company: 'Google',    role: 'AI Engineer',         score: 85, tag: 'Sample' },
+  { id: 's2', company: 'Meta',      role: 'Product Manager',     score: 72, tag: 'Sample' },
+  { id: 's3', company: 'Stripe',    role: 'Frontend Engineer',   score: 91, tag: 'Sample' },
+];
+
+function timeAgo(d) {
+  if (!d) return '';
+  const m = Math.floor((Date.now() - new Date(d)) / 60000);
+  if (m < 60) return `${m}m ago`;
+  if (m < 1440) return `${Math.floor(m/60)}h ago`;
+  return `${Math.floor(m/1440)}d ago`;
 }
 
 export default function AnalyzeScreen() {
-  const [resumeFile, setResumeFile] = useState(null);
-  const [jdText, setJdText] = useState('');
+  const { colors: C, gradient: GRAD, shadowSm, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
+
+  const [file, setFile]       = useState(null);
+  const [jd, setJd]           = useState('');
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
-  const [recentAnalyses, setRecentAnalyses] = useState([]);
-  const [loadingRecent, setLoadingRecent] = useState(true);
+  const [result, setResult]   = useState(null);
+  const [recent, setRecent]   = useState([]);
+  const [lr, setLr]           = useState(true);
+
+  const glassBox = [
+    styles.glassBox,
+    isDark
+      ? { backgroundColor: 'rgba(139,127,255,0.07)', borderColor: 'rgba(139,127,255,0.35)', shadowColor: '#8B7FFF', shadowOpacity: 0.4, shadowRadius: 18 }
+      : { backgroundColor: '#fff', borderColor: C.border, ...shadowSm },
+  ];
 
   const loadRecent = useCallback(async () => {
-    setLoadingRecent(true);
+    setLr(true);
     const data = await fetchAnalyses(5);
-    setRecentAnalyses(data);
-    setLoadingRecent(false);
+    setRecent(data); setLr(false);
   }, []);
 
   useEffect(() => { loadRecent(); }, [loadRecent]);
 
   const pickDoc = async () => {
     const res = await DocumentPicker.getDocumentAsync({ type: 'application/pdf' });
-    if (!res.canceled && res.assets?.length > 0) setResumeFile(res.assets[0]);
+    if (!res.canceled && res.assets?.length) setFile(res.assets[0]);
   };
 
-  const handleAnalyze = async () => {
-    if (!jdText.trim()) return;
-    Keyboard.dismiss();
-    setLoading(true);
+  const analyze = async () => {
+    if (!jd.trim()) return;
+    Keyboard.dismiss(); setLoading(true);
     try {
-      const data = await analyzeGap(resumeFile?.uri, jdText);
-      setResult(data);
-      // Refresh recent list after new analysis
-      loadRecent();
+      const data = await analyzeGap(file?.uri, jd);
+      setResult(data); loadRecent();
     } catch {
-      setResult({ match_score: 0, cheat_sheet: ['Analysis failed. Check backend connection.'] });
+      setResult({ match_score: 0, cheat_sheet: ['Analysis failed. Please check connection.'] });
     } finally { setLoading(false); }
   };
 
+  // ── Result ──────────────────────────────────────────────────────────────
   if (result) {
     return (
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        <TouchableOpacity onPress={() => setResult(null)} style={styles.backBtn}>
-          <Text style={styles.backText}>← New Analysis</Text>
+      <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={[styles.content, { paddingTop: insets.top + 68, paddingBottom: 110 }]}>
+        <TouchableOpacity onPress={() => setResult(null)} style={[styles.backBtn, { backgroundColor: C.primaryLight }]}>
+          <Text style={{ color: C.primary, fontWeight: '700' }}>← New Analysis</Text>
         </TouchableOpacity>
         <LinearGradient colors={GRAD} style={styles.scoreCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-          <Text style={styles.scoreLabel}>Match Score</Text>
+          <Text style={styles.scoreLabel}>ATS Match Score</Text>
           <Text style={styles.scoreValue}>{result.match_score}%</Text>
-          <Text style={styles.scoreSub}>{result.match_score >= 70 ? '✓ Strong Match' : '⚠ Needs Work'}</Text>
         </LinearGradient>
-        <Text style={styles.sectionTitle}>Key Insights</Text>
+        <Text style={[styles.sectionTitle, { color: C.text }]}>Key Insights</Text>
         {result.cheat_sheet?.map((item, i) => (
-          <View key={i} style={styles.insightCard}>
-            <View style={styles.bullet}><Text style={styles.bulletText}>{i + 1}</Text></View>
-            <Text style={styles.insightText}>{item}</Text>
+          <View key={i} style={[...glassBox, { flexDirection: 'row', gap: 12, marginBottom: 10 }]}>
+            <View style={[styles.bullet, { backgroundColor: C.primary }]}><Text style={{ color: '#fff', fontWeight: '800' }}>{i+1}</Text></View>
+            <Text style={{ flex: 1, color: C.text, fontSize: 14, lineHeight: 20 }}>{item}</Text>
           </View>
         ))}
       </ScrollView>
     );
   }
 
+  // ── Input ───────────────────────────────────────────────────────────────
+  const displayRecent = recent.length > 0 ? recent : null;
+
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.pageTitle}>Job Analyzer</Text>
-        <Text style={styles.pageSubtitle}>Analyze job descriptions and get personalized recommendations</Text>
+    <ScrollView
+      style={{ flex: 1, backgroundColor: C.bg }}
+      contentContainerStyle={[styles.content, { paddingTop: insets.top + 68, paddingBottom: 110 }]}
+      keyboardShouldPersistTaps="handled"
+    >
+      <Text style={[styles.pageTitle, { color: C.text }]}>Analyze Job</Text>
+      <Text style={[styles.pageSub, { color: C.subtext }]}>Upload your resume & paste the job description</Text>
 
-        <TouchableOpacity onPress={pickDoc} style={[styles.uploadCard, resumeFile && styles.uploadActive]}>
-          <Text style={styles.uploadIcon}>{resumeFile ? '✓' : '↑'}</Text>
-          <Text style={[styles.uploadLabel, resumeFile && { color: '#10B981' }]}>
-            {resumeFile ? resumeFile.name : 'Upload Your Resume'}
-          </Text>
-          <Text style={styles.uploadSub}>{resumeFile ? 'Tap to change' : 'PDF format · optional'}</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.inputLabel}>Job Description</Text>
-        <TextInput
-          style={styles.jdInput}
-          placeholder="Paste the full job description here..."
-          placeholderTextColor={C.border}
-          value={jdText}
-          onChangeText={setJdText}
-          multiline textAlignVertical="top"
-        />
-
-        <TouchableOpacity onPress={handleAnalyze} disabled={!jdText.trim() || loading} activeOpacity={0.85}>
-          <LinearGradient
-            colors={!jdText.trim() ? ['#C4C4C4', '#C4C4C4'] : GRAD}
-            style={styles.analyzeBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-          >
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.analyzeBtnText}>🔍  Analyze Job</Text>}
-          </LinearGradient>
-        </TouchableOpacity>
-
-        <View style={styles.sectionRow}>
-          <Text style={styles.sectionTitle}>Recent Analyses</Text>
-        </View>
-        <View style={styles.card}>
-          {loadingRecent ? (
-            <ActivityIndicator color={C.primary} style={{ padding: 20 }} />
-          ) : recentAnalyses.length === 0 ? (
-            <View style={{ padding: 20, alignItems: 'center' }}>
-              <Text style={{ color: C.subtext, fontSize: 13 }}>No analyses yet. Run your first one above!</Text>
-            </View>
-          ) : (
-            recentAnalyses.map((r, i) => {
-              const color = r.match_score >= 70 ? '#10B981' : '#F59E0B';
-              return (
-                <View key={r.id} style={[styles.recentRow, i < recentAnalyses.length - 1 && styles.rowBorder]}>
-                  <View style={styles.recentIcon}><Text>📄</Text></View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.recentRole}>{r.role || 'Gap Analysis'}</Text>
-                    <Text style={styles.recentCompany}>{r.company || 'Unknown company'} · {timeAgo(r.created_at)}</Text>
-                  </View>
-                  <View style={[styles.pctBadge, { backgroundColor: color + '22' }]}>
-                    <Text style={[styles.pctText, { color }]}>{r.match_score}%</Text>
-                  </View>
-                </View>
-              );
-            })
+      {/* ── Prominent Glass Upload Box ───────────────────────────── */}
+      <TouchableOpacity onPress={pickDoc} activeOpacity={0.85}>
+        <View style={[
+          ...glassBox,
+          styles.uploadBox,
+          file && { borderColor: '#10B981', borderStyle: 'solid', shadowColor: '#10B981' },
+        ]}>
+          {isDark && (
+            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
           )}
+          <LinearGradient
+            colors={file ? ['rgba(16,185,129,0.15)', 'rgba(16,185,129,0.05)'] : ['rgba(139,127,255,0.12)', 'rgba(108,99,255,0.04)']}
+            style={styles.uploadGrad}
+          >
+            <View style={[styles.uploadIconWrap, { backgroundColor: file ? '#10B98133' : 'rgba(139,127,255,0.2)', shadowColor: file ? '#10B981' : '#8B7FFF', shadowOpacity: 0.6, shadowRadius: 16, shadowOffset: { width: 0, height: 0 }, elevation: 0 }]}>
+              <Text style={{ fontSize: 32 }}>{file ? '✓' : '↑'}</Text>
+            </View>
+            <Text style={[styles.uploadTitle, { color: file ? '#10B981' : C.text }]}>
+              {file ? file.name : 'Upload Your Resume'}
+            </Text>
+            <Text style={[styles.uploadSub, { color: C.subtext }]}>
+              {file ? 'Tap to change file' : 'PDF · Drag & drop or tap to browse'}
+            </Text>
+            {!file && (
+              <View style={[styles.uploadPillBtn, { backgroundColor: isDark ? 'rgba(139,127,255,0.2)' : C.primaryLight, borderColor: C.primary, borderWidth: 1 }]}>
+                <Text style={[styles.uploadPillText, { color: C.primary }]}>Browse Files</Text>
+              </View>
+            )}
+          </LinearGradient>
         </View>
-      </ScrollView>
-    </TouchableWithoutFeedback>
+      </TouchableOpacity>
+
+      {/* JD Input */}
+      <Text style={[styles.inputLabel, { color: C.text }]}>Job Description</Text>
+      <TextInput
+        style={[
+          styles.jdInput,
+          { backgroundColor: isDark ? 'rgba(139,127,255,0.06)' : C.inputBg, borderColor: isDark ? 'rgba(139,127,255,0.3)' : C.border, color: C.text },
+        ]}
+        placeholder="Paste the full job description here..."
+        placeholderTextColor={C.subtext}
+        value={jd} onChangeText={setJd}
+        multiline textAlignVertical="top"
+      />
+
+      <TouchableOpacity onPress={analyze} disabled={!jd.trim() || loading} activeOpacity={0.85}>
+        <LinearGradient
+          colors={!jd.trim() ? ['#555', '#555'] : GRAD}
+          style={styles.analyzeBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+        >
+          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.analyzeBtnText}>🔍  Analyze Job</Text>}
+        </LinearGradient>
+      </TouchableOpacity>
+
+      {/* Recent Analyses */}
+      <Text style={[styles.sectionTitle, { color: C.text }]}>Recent Analyses</Text>
+      {lr ? (
+        <ActivityIndicator color={C.primary} />
+      ) : (
+        (displayRecent || SAMPLE_ANALYSES).map((r, i) => {
+          const isSample = !r.created_at;
+          const score    = r.match_score ?? r.score;
+          const color    = score >= 80 ? '#10B981' : score >= 65 ? '#F59E0B' : '#EF4444';
+          const title    = r.role || 'Gap Analysis';
+          const company  = r.company || (r.jd_snippet ? r.jd_snippet.slice(0, 28) + '…' : '—');
+          return (
+            <View key={r.id} style={[...glassBox, { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10, opacity: isSample ? 0.65 : 1 }]}>
+              <View style={[styles.recentIcon, { backgroundColor: color + '22' }]}>
+                <Text style={{ fontSize: 18 }}>📄</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: C.text }}>{company} · {title}</Text>
+                <Text style={{ fontSize: 12, color: C.subtext, marginTop: 2 }}>
+                  {isSample ? '(Sample)' : timeAgo(r.created_at)}
+                </Text>
+              </View>
+              <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                <View style={[styles.pctBadge, { backgroundColor: color + '22' }]}>
+                  <Text style={{ fontSize: 14, fontWeight: '900', color }}>{score}%</Text>
+                </View>
+                <Text style={{ fontSize: 10, color: C.subtext }}>Match</Text>
+              </View>
+            </View>
+          );
+        })
+      )}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: C.bg },
-  content: { padding: 16, paddingBottom: 40 },
-  pageTitle: { fontSize: 24, fontWeight: '800', color: C.text, marginBottom: 6 },
-  pageSubtitle: { fontSize: 14, color: C.subtext, marginBottom: 20, lineHeight: 20 },
-  uploadCard: {
-    borderWidth: 2, borderColor: C.border, borderStyle: 'dashed',
-    borderRadius: 16, padding: 24, alignItems: 'center', marginBottom: 20, backgroundColor: C.surface,
-  },
-  uploadActive: { borderColor: '#10B981', borderStyle: 'solid', backgroundColor: '#ECFDF5' },
-  uploadIcon: { fontSize: 32, marginBottom: 8 },
-  uploadLabel: { color: C.text, fontSize: 15, fontWeight: '700' },
-  uploadSub: { color: C.subtext, fontSize: 12, marginTop: 4 },
-  inputLabel: { fontSize: 13, fontWeight: '600', color: C.text, marginBottom: 8 },
-  jdInput: {
-    backgroundColor: C.surface, borderWidth: 1.5, borderColor: C.border,
-    borderRadius: 14, padding: 16, minHeight: 140,
-    fontSize: 14, color: C.text, lineHeight: 22, marginBottom: 20,
-  },
-  analyzeBtn: { borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginBottom: 24 },
-  analyzeBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  sectionTitle: { fontSize: 17, fontWeight: '700', color: C.text },
-  card: { backgroundColor: C.surface, borderRadius: 16, overflow: 'hidden', ...shadowSm, shadowColor: '#000' },
-  recentRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
-  rowBorder: { borderBottomWidth: 1, borderBottomColor: C.border },
-  recentIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: C.primaryLight, alignItems: 'center', justifyContent: 'center' },
-  recentRole: { color: C.text, fontSize: 13, fontWeight: '600' },
-  recentCompany: { color: C.subtext, fontSize: 12, marginTop: 2 },
-  pctBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
-  pctText: { fontSize: 13, fontWeight: '700' },
-  backBtn: { marginBottom: 20, alignSelf: 'flex-start', backgroundColor: C.primaryLight, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
-  backText: { color: C.primary, fontWeight: '700' },
-  scoreCard: { borderRadius: 20, padding: 28, alignItems: 'center', marginBottom: 24, ...shadow },
-  scoreLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 13, fontWeight: '600', marginBottom: 8 },
-  scoreValue: { color: '#fff', fontSize: 64, fontWeight: '900' },
-  scoreSub: { color: 'rgba(255,255,255,0.9)', fontSize: 15, marginTop: 4 },
-  insightCard: {
-    flexDirection: 'row', backgroundColor: C.surface, borderRadius: 14,
-    padding: 16, marginBottom: 10, gap: 12, ...shadowSm, shadowColor: '#000',
-  },
-  bullet: { width: 26, height: 26, borderRadius: 13, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center' },
-  bulletText: { color: '#fff', fontSize: 12, fontWeight: '800' },
-  insightText: { color: C.text, flex: 1, fontSize: 14, lineHeight: 20 },
+  content:        { paddingHorizontal: 18 },
+  pageTitle:      { fontSize: 24, fontWeight: '800', marginBottom: 5, letterSpacing: -0.5 },
+  pageSub:        { fontSize: 13, marginBottom: 22, lineHeight: 19 },
+  glassBox:       { borderRadius: 20, borderWidth: 1.5, overflow: 'hidden', marginBottom: 16 },
+  uploadBox:      { borderStyle: 'dashed', minHeight: 180 },
+  uploadGrad:     { padding: 28, alignItems: 'center', gap: 12 },
+  uploadIconWrap: { width: 64, height: 64, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  uploadTitle:    { fontSize: 16, fontWeight: '800' },
+  uploadSub:      { fontSize: 12, textAlign: 'center' },
+  uploadPillBtn:  { borderRadius: 20, paddingHorizontal: 18, paddingVertical: 8, marginTop: 4 },
+  uploadPillText: { fontSize: 13, fontWeight: '700' },
+  inputLabel:     { fontSize: 13, fontWeight: '700', marginBottom: 8 },
+  jdInput:        { borderWidth: 1.5, borderRadius: 16, padding: 16, minHeight: 120, fontSize: 14, lineHeight: 22, marginBottom: 18 },
+  analyzeBtn:     { borderRadius: 16, paddingVertical: 16, alignItems: 'center', marginBottom: 28, shadowColor: '#6C63FF', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 6 },
+  analyzeBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  sectionTitle:   { fontSize: 17, fontWeight: '800', marginBottom: 12, letterSpacing: -0.2 },
+  recentIcon:     { width: 44, height: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  pctBadge:       { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+  bullet:         { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  backBtn:        { alignSelf: 'flex-start', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8, marginBottom: 20 },
+  scoreCard:      { borderRadius: 24, padding: 30, alignItems: 'center', marginBottom: 24 },
+  scoreLabel:     { color: 'rgba(255,255,255,0.8)', fontSize: 14, marginBottom: 6 },
+  scoreValue:     { color: '#fff', fontSize: 64, fontWeight: '900', letterSpacing: -2 },
 });
